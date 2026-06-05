@@ -1,0 +1,338 @@
+export type Employee = {
+  id: string
+  defaultName: string
+  role: string
+  department: string
+  tagline: string
+  description: string
+  responsibilities: string[]
+  color: string
+  bgColor: string
+  emoji: string
+  apiRoute?: string
+  apiFormat?: string
+  promptKey?: string
+}
+
+export const EMPLOYEES: Employee[] = [
+  {
+    id: 'alex-morgan',
+    defaultName: 'Alex Morgan',
+    role: 'Research Strategist',
+    department: 'Strategy',
+    tagline: 'I dig deep so you never write blind.',
+    description: 'Alex runs deep research on any topic, competitor, or URL. Give me a subject and I\'ll come back with a full content brief, keyword opportunities, SEO angles, competitor gaps, and exactly what your audience is searching for.',
+    responsibilities: [
+      'Topic & keyword research',
+      'Competitor content analysis',
+      'SEO & GEO opportunity mapping',
+      'Content brief generation',
+      'FAQ & topic cluster mapping',
+      'Search intent analysis',
+    ],
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-500',
+    emoji: '🔬',
+    apiRoute: '/api/v1/research',
+  },
+  {
+    id: 'james-harper',
+    defaultName: 'James Harper',
+    role: 'Blog Writer',
+    department: 'Content',
+    tagline: 'Long-form that ranks and gets read.',
+    description: 'James writes SEO-optimized blog articles that sound like a real person wrote them. Full articles with H1, H2, H3 structure, meta descriptions, FAQs, CTAs, and internal linking suggestions — ready to publish.',
+    responsibilities: [
+      'Long-form blog article writing',
+      'SEO title & meta description',
+      'Article outline & structure',
+      'FAQ & CTA sections',
+      'GEO/AEO optimization',
+      'WordPress publishing',
+    ],
+    color: 'text-indigo-400',
+    bgColor: 'bg-indigo-500',
+    emoji: '✍️',
+    apiRoute: '/api/v1/generate/blog',
+  },
+  {
+    id: 'sophia-chen',
+    defaultName: 'Sophia Chen',
+    role: 'LinkedIn Specialist',
+    department: 'Social Media',
+    tagline: 'I turn your expertise into authority.',
+    description: 'Sophia writes LinkedIn posts and carousels that build your professional brand. Thought leadership, founder stories, educational posts — everything formatted for LinkedIn\'s algorithm and your audience.',
+    responsibilities: [
+      'LinkedIn post writing',
+      'Carousel script creation',
+      'Thought leadership content',
+      'Founder story angles',
+      'Poll & engagement posts',
+      'LinkedIn publishing',
+    ],
+    color: 'text-sky-400',
+    bgColor: 'bg-sky-500',
+    emoji: '💼',
+    apiRoute: '/api/v1/generate/linkedin',
+    apiFormat: 'post',
+  },
+  {
+    id: 'ryan-blake',
+    defaultName: 'Ryan Blake',
+    role: 'X / Twitter Strategist',
+    department: 'Social Media',
+    tagline: 'Short, sharp, and worth retweeting.',
+    description: 'Ryan writes tweets and threads that cut through the noise. He keeps it sharp, direct, and on-brand — no corporate speak, no filler. Just content worth reading and sharing.',
+    responsibilities: [
+      'Tweet copywriting',
+      'Thread scripting',
+      'Engagement content',
+      'Hook writing',
+      'X / Twitter publishing',
+    ],
+    color: 'text-zinc-300',
+    bgColor: 'bg-zinc-600',
+    emoji: '⚡',
+    apiRoute: '/api/v1/generate/x',
+    apiFormat: 'post',
+  },
+  {
+    id: 'maya-patel',
+    defaultName: 'Maya Patel',
+    role: 'Instagram Creator',
+    department: 'Social Media',
+    tagline: 'Captions that stop the scroll.',
+    description: 'Maya writes Instagram captions, carousel copy, and reel scripts that get saves and follows. She knows what works on Instagram — hooks, hashtags, CTAs — and delivers it all in your brand voice.',
+    responsibilities: [
+      'Instagram caption writing',
+      'Carousel copy & scripts',
+      'Reel scripts',
+      'Hashtag strategy',
+      'Story content',
+      'Instagram publishing',
+    ],
+    color: 'text-pink-400',
+    bgColor: 'bg-pink-500',
+    emoji: '📸',
+    apiRoute: '/api/v1/generate/instagram',
+    apiFormat: 'caption',
+  },
+  {
+    id: 'ethan-cole',
+    defaultName: 'Ethan Cole',
+    role: 'YouTube Scriptwriter',
+    department: 'Video',
+    tagline: 'Scripts that keep viewers watching.',
+    description: 'Ethan writes YouTube scripts, titles, descriptions, and chapter markers. Long-form, Shorts, tutorials — he structures every video to maximize watch time and subscriber growth.',
+    responsibilities: [
+      'Long-form YouTube scripts',
+      'YouTube Shorts scripts',
+      'Video titles & thumbnails',
+      'Description & chapters',
+      'Tags & SEO metadata',
+      'YouTube publishing',
+    ],
+    color: 'text-red-400',
+    bgColor: 'bg-red-500',
+    emoji: '🎬',
+    apiRoute: '/api/v1/generate/youtube',
+    apiFormat: 'long_form',
+  },
+  {
+    id: 'olivia-rhodes',
+    defaultName: 'Olivia Rhodes',
+    role: 'Newsletter Writer',
+    department: 'Email',
+    tagline: 'Newsletters your subscribers look forward to.',
+    description: 'Olivia writes newsletters that feel personal, deliver real value, and build your audience. Weekly digests, educational issues, product launches — she makes email your most powerful channel.',
+    responsibilities: [
+      'Newsletter writing',
+      'Subject line optimization',
+      'Email sequence planning',
+      'Subscriber engagement',
+      'Gmail API sending',
+    ],
+    color: 'text-green-400',
+    bgColor: 'bg-green-500',
+    emoji: '📨',
+    apiRoute: '/api/v1/generate/newsletter',
+    apiFormat: 'weekly',
+  },
+  {
+    id: 'noah-bennett',
+    defaultName: 'Noah Bennett',
+    role: 'Content Repurposing Specialist',
+    department: 'Content',
+    tagline: 'One piece of content, every platform.',
+    description: 'Noah takes your existing content and turns it into every format you need. Give him a blog post and he\'ll turn it into LinkedIn posts, X threads, Instagram carousels, newsletters, and more.',
+    responsibilities: [
+      'Blog → social media',
+      'Video → articles',
+      'Podcast → posts',
+      'Cross-platform adaptation',
+      'Format optimization',
+      'Bulk repurposing',
+    ],
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500',
+    emoji: '♻️',
+    apiRoute: '/api/v1/generate/repurpose',
+  },
+  {
+    id: 'zara-kim',
+    defaultName: 'Zara Kim',
+    role: 'Visual Designer',
+    department: 'Design',
+    tagline: 'Images that match your brand and stop the scroll.',
+    description: 'Zara generates custom images for every platform — blog featured images, LinkedIn graphics, Instagram carousels, YouTube thumbnails. She keeps your visual identity consistent across everything.',
+    responsibilities: [
+      'Blog featured images',
+      'Social media graphics',
+      'Carousel slide designs',
+      'YouTube thumbnails',
+      'Quote graphics',
+      'Brand-consistent visuals',
+    ],
+    color: 'text-purple-400',
+    bgColor: 'bg-purple-500',
+    emoji: '🎨',
+    apiRoute: '/api/v1/generate/images',
+  },
+  {
+    id: 'lucas-wright',
+    defaultName: 'Lucas Wright',
+    role: 'Publishing Manager',
+    department: 'Operations',
+    tagline: 'Content goes out on time, every time.',
+    description: 'Lucas handles all publishing and scheduling across every platform. Connect your channels and he takes care of the rest — WordPress, LinkedIn, X, Instagram, YouTube. Immediate or scheduled.',
+    responsibilities: [
+      'Multi-platform publishing',
+      'Content scheduling',
+      'Approval management',
+      'Platform connections',
+      'Bulk publishing',
+      'Publishing history',
+    ],
+    color: 'text-teal-400',
+    bgColor: 'bg-teal-500',
+    emoji: '🚀',
+    apiRoute: '/api/v1/publish',
+  },
+  {
+    id: 'emma-davis',
+    defaultName: 'Emma Davis',
+    role: 'Analytics Analyst',
+    department: 'Strategy',
+    tagline: 'I tell you what\'s working and what\'s wasting your time.',
+    description: 'Emma tracks performance across every platform and tells you exactly what\'s working. Impressions, engagement, clicks — she synthesizes it all into clear insights so you know where to focus.',
+    responsibilities: [
+      'Cross-platform analytics',
+      'Performance reporting',
+      'Content scoring',
+      'Engagement analysis',
+      'ROI tracking',
+      'Growth insights',
+    ],
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500',
+    emoji: '📊',
+    apiRoute: '/api/v1/analytics',
+  },
+  {
+    id: 'kai-nakamura',
+    defaultName: 'Kai Nakamura',
+    role: 'Trend Intelligence Analyst',
+    department: 'Strategy',
+    tagline: 'I spot trends before your competitors do.',
+    description: 'Kai monitors industry news, social discussions, and search trends daily. He flags rising topics and content opportunities before they peak so you can be first to publish on what\'s about to go viral.',
+    responsibilities: [
+      'Daily trend monitoring',
+      'Industry news tracking',
+      'Content opportunity alerts',
+      'Competitor monitoring',
+      'Emerging topic prediction',
+    ],
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500',
+    emoji: '📈',
+    apiRoute: '/api/v1/trends',
+  },
+  {
+    id: 'grace-sterling',
+    defaultName: 'Grace Sterling',
+    role: 'Brand & Knowledge Manager',
+    department: 'Strategy',
+    tagline: 'I make sure every word sounds like you.',
+    description: 'Grace manages your workspace\'s knowledge — brand voice, audience personas, offers, case studies. She makes sure every team member has the context they need to produce content that sounds exactly like you.',
+    responsibilities: [
+      'Brand voice management',
+      'Audience persona building',
+      'Offer & service documentation',
+      'Case study library',
+      'Writing sample curation',
+      'Knowledge base maintenance',
+    ],
+    color: 'text-violet-400',
+    bgColor: 'bg-violet-500',
+    emoji: '🧠',
+    apiRoute: '/api/v1/brain',
+  },
+  {
+    id: 'liam-foster',
+    defaultName: 'Liam Foster',
+    role: 'Content Editor',
+    department: 'Content',
+    tagline: 'I make sure nothing sounds like it came from a robot.',
+    description: 'Liam reviews every piece of content before it goes out. He checks for AI detection risk, readability, brand voice consistency, and natural language quality — then rewrites anything that doesn\'t pass.',
+    responsibilities: [
+      'AI detection scanning',
+      'Content humanization',
+      'Readability optimization',
+      'Brand voice checking',
+      'Quality scoring',
+      'Rewriting & editing',
+    ],
+    color: 'text-slate-400',
+    bgColor: 'bg-slate-500',
+    emoji: '✅',
+    apiRoute: '/api/v1/humanize',
+  },
+  {
+    id: 'ava-mitchell',
+    defaultName: 'Ava Mitchell',
+    role: 'Executive Assistant',
+    department: 'Operations',
+    tagline: 'Your inbox, organized. Your calendar, managed.',
+    description: 'Ava manages your Gmail inbox with AI intelligence. She reads, summarizes, drafts replies, and organizes your communication so you only deal with what actually needs your attention.',
+    responsibilities: [
+      'Gmail inbox management',
+      'Email summarization',
+      'Draft reply generation',
+      'Calendar management',
+      'Google Drive access',
+      'Priority email flagging',
+    ],
+    color: 'text-rose-400',
+    bgColor: 'bg-rose-500',
+    emoji: '📋',
+    apiRoute: '/api/v1/gmail/threads',
+  },
+]
+
+export function getEmployee(id: string): Employee | undefined {
+  return EMPLOYEES.find(e => e.id === id)
+}
+
+// Load custom names from localStorage
+export function getEmployeeName(id: string): string {
+  if (typeof window === 'undefined') {
+    return EMPLOYEES.find(e => e.id === id)?.defaultName || id
+  }
+  const stored = localStorage.getItem(`employee_name_${id}`)
+  return stored || EMPLOYEES.find(e => e.id === id)?.defaultName || id
+}
+
+export function setEmployeeName(id: string, name: string): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(`employee_name_${id}`, name)
+}
