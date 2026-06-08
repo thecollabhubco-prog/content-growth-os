@@ -194,15 +194,32 @@ export function useMeeting() {
     setMessages([])
     setStatus('active')
 
-    // Welcome message from the first employee (or a general one)
-    setTimeout(() => {
+    // Welcome message — warm and human, from first participant
+    setTimeout(async () => {
       const first = parts[0]
       if (first) {
-        const welcomeText = `Welcome to the meeting! There are ${parts.length} of us here today. Just address any of us by name and we'll respond. You can also broadcast to the whole team. Ready when you are.`
+        // Use the AI to generate a natural welcome rather than a hardcoded string
+        let welcomeText: string
+        try {
+          const res = await fetch('/api/v1/voice/respond', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-workspace-id': WORKSPACE_ID },
+            body: JSON.stringify({
+              employee_id: first.employee.id,
+              message: `The meeting is just starting. There are ${parts.length} team members in this meeting. Welcome everyone and let the founder know you're all ready. Keep it natural and brief.`,
+              mode: 'welcome',
+            }),
+          })
+          const data = await res.json()
+          welcomeText = data.success ? data.response : `Hey, welcome! Good to have everyone here. There are ${parts.length} of us on the call. Just say a name to direct something to someone, or talk to the group. What are we working on today?`
+        } catch {
+          welcomeText = `Hey, welcome! Good to have everyone here. There are ${parts.length} of us on the call. Just say a name to direct something to someone, or talk to the group. What are we working on today?`
+        }
         addMessage(first.employee.id, welcomeText)
         playVoice(first.employee.id, welcomeText)
       }
     }, 800)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const endMeeting = useCallback(() => {
@@ -248,35 +265,53 @@ export function useMeeting() {
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isProcessing) return
 
-    // Add user message
     addMessage('user', text)
     setIsProcessing(true)
 
     const addressed = detectAddressedEmployee(text, participants)
+    const lower = text.toLowerCase().trim()
+
+    // Detect casual conversation
+    const isCasual = /^(hi|hey|hello|hiya|yo|sup|what'?s up|howdy|good (morning|afternoon|evening)|how (are|is|you|everyone|it going)|thanks|thank you|cheers|great|awesome|cool|nice|what'?s new)/.test(lower)
 
     if (addressed === 'all') {
-      // All participants respond in sequence
-      const responders = participants.slice(0, 3) // max 3 for all-hands to avoid being slow
+      // For casual messages, pick 1-2 social/outgoing employees
+      // For work broadcasts, pick up to 3 relevant employees
+      let responders = participants
+      if (isCasual) {
+        // Pick 1-2 employees — prefer social ones (Sophia, Maya, Ava, Olivia, Ethan)
+        const socialOrder = ['sophia-chen', 'maya-patel', 'ava-mitchell', 'olivia-rhodes', 'ethan-cole', 'kai-nakamura']
+        const sorted = [...participants].sort((a, b) => {
+          const ai = socialOrder.indexOf(a.employee.id)
+          const bi = socialOrder.indexOf(b.employee.id)
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+        })
+        responders = sorted.slice(0, 2)
+      } else {
+        responders = participants.slice(0, 3)
+      }
+
       for (const p of responders) {
         try {
           const response = await callEmployeeVoiceAPI(p.employee.id, text)
           addMessage(p.employee.id, response)
-          await new Promise<void>(resolve => {
-            const apiKey = localStorage.getItem('elevenlabs_api_key') || undefined
-            setActiveSpeakerId(p.employee.id)
-            setParticipants(prev => prev.map(part => ({ ...part, isSpeaking: part.employee.id === p.employee.id, hasSpoken: part.employee.id === p.employee.id ? true : part.hasSpoken })))
-            speakAsEmployee(p.employee.id, response, apiKey).finally(() => {
-              setParticipants(prev => prev.map(part => ({ ...part, isSpeaking: false })))
-              setActiveSpeakerId(null)
-              resolve()
-            })
-          })
+          setParticipants(prev => prev.map(part => ({
+            ...part,
+            isSpeaking: part.employee.id === p.employee.id,
+            hasSpoken: part.employee.id === p.employee.id ? true : part.hasSpoken,
+            lastMessage: part.employee.id === p.employee.id ? response : part.lastMessage,
+          })))
+          setActiveSpeakerId(p.employee.id)
+          await speakAsEmployee(p.employee.id, response)
+          setParticipants(prev => prev.map(part => ({ ...part, isSpeaking: false })))
+          setActiveSpeakerId(null)
         } catch (e) {
           console.warn(e)
+          setParticipants(prev => prev.map(part => ({ ...part, isSpeaking: false })))
+          setActiveSpeakerId(null)
         }
       }
     } else {
-      // Single employee responds
       const participant = participants.find(p => p.employee.id === addressed)
       if (participant) {
         try {
@@ -284,18 +319,24 @@ export function useMeeting() {
           addMessage(addressed, response)
           setParticipants(prev => prev.map(p => ({
             ...p,
+            isSpeaking: p.employee.id === addressed,
             hasSpoken: p.employee.id === addressed ? true : p.hasSpoken,
             lastMessage: p.employee.id === addressed ? response : p.lastMessage,
           })))
-          await playVoice(addressed, response)
+          setActiveSpeakerId(addressed)
+          await speakAsEmployee(addressed, response)
+          setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
+          setActiveSpeakerId(null)
         } catch (e) {
           console.warn(e)
+          setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
+          setActiveSpeakerId(null)
         }
       }
     }
 
     setIsProcessing(false)
-  }, [participants, isProcessing, addMessage, playVoice])
+  }, [participants, isProcessing, addMessage])
 
   return {
     status,
