@@ -15,9 +15,10 @@ export interface MeetingParticipant {
 
 export interface MeetingMessage {
   id: string
-  from: 'user' | string // employee id
+  from: 'user' | string
   text: string
   timestamp: Date
+  intent?: string
 }
 
 export interface MeetingPreset {
@@ -30,10 +31,17 @@ export interface MeetingPreset {
 
 export const MEETING_PRESETS: MeetingPreset[] = [
   {
+    id: 'daily-standup',
+    label: 'Daily Standup',
+    emoji: '☀️',
+    description: 'Quick catch-up — what\'s everyone working on today?',
+    employeeIds: ['alex-morgan', 'sophia-chen', 'james-harper', 'emma-davis', 'ava-mitchell'],
+  },
+  {
     id: 'content-sprint',
     label: 'Content Sprint',
     emoji: '⚡',
-    description: 'Write content fast — all content creators in the room',
+    description: 'Full content team — write, publish, and distribute',
     employeeIds: ['james-harper', 'sophia-chen', 'ryan-blake', 'maya-patel', 'ethan-cole', 'olivia-rhodes'],
   },
   {
@@ -68,198 +76,181 @@ export const MEETING_PRESETS: MeetingPreset[] = [
 
 const WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
 
-// Detect which employee is being addressed in the message
-function detectAddressedEmployee(text: string, participants: MeetingParticipant[]): string | 'all' {
+// ─── INTENT DETECTION ─────────────────────────────────────────────────────────
+type RoutingIntent = 'greeting' | 'standup' | 'addressed' | 'broadcast'
+
+function detectRoutingIntent(text: string): RoutingIntent {
+  const lower = text.toLowerCase().trim()
+
+  if (/^(hi|hey|hello|hiya|good morning|good afternoon|morning|yo|sup|howdy)/.test(lower)) {
+    return 'greeting'
+  }
+  if (/(what'?s (the )?update|what'?s happening|how'?s (everything|progress|it going)|catch me up|fill me in|any updates|update me|status|what (are|have) you (all |everyone |guys )?(been|done|working))/.test(lower)) {
+    return 'standup'
+  }
+
+  return 'broadcast'
+}
+
+// Detect if message directly addresses one employee by name or role
+function detectAddressedEmployee(text: string, participants: MeetingParticipant[]): string | null {
   const lower = text.toLowerCase()
 
-  // Check for direct name addressing: "James, ...", "Hey Sophia, ..."
   for (const p of participants) {
     const firstName = p.employee.defaultName.split(' ')[0].toLowerCase()
     if (
-      lower.startsWith(firstName) ||
-      lower.startsWith(`hey ${firstName}`) ||
-      lower.startsWith(`hi ${firstName}`) ||
-      lower.includes(`, ${firstName},`) ||
-      lower.includes(`@${firstName}`)
+      lower.startsWith(firstName + ',') ||
+      lower.startsWith(firstName + ' ') ||
+      lower.startsWith('hey ' + firstName) ||
+      lower.startsWith('hi ' + firstName) ||
+      lower.includes(', ' + firstName + ',') ||
+      lower.includes('@' + firstName)
     ) {
       return p.employee.id
     }
-    // Also check custom names
-    const customName = getEmployeeName(p.employee.id).split(' ')[0].toLowerCase()
-    if (customName !== firstName && (lower.startsWith(customName) || lower.startsWith(`hey ${customName}`))) {
+    const customFirst = getEmployeeName(p.employee.id).split(' ')[0].toLowerCase()
+    if (customFirst !== firstName && (
+      lower.startsWith(customFirst + ',') ||
+      lower.startsWith(customFirst + ' ') ||
+      lower.startsWith('hey ' + customFirst)
+    )) {
       return p.employee.id
     }
   }
 
-  // Check for role-based addressing
+  // Role keywords
   const roleKeywords: Record<string, string> = {
-    'researcher': 'alex-morgan',
-    'research': 'alex-morgan',
-    'blog': 'james-harper',
-    'article': 'james-harper',
-    'linkedin': 'sophia-chen',
-    'twitter': 'ryan-blake',
-    'tweet': 'ryan-blake',
-    'instagram': 'maya-patel',
-    'youtube': 'ethan-cole',
-    'newsletter': 'olivia-rhodes',
-    'email': 'olivia-rhodes',
-    'repurpose': 'noah-bennett',
-    'image': 'zara-kim',
-    'visual': 'zara-kim',
-    'publish': 'lucas-wright',
-    'schedule': 'lucas-wright',
-    'analytics': 'emma-davis',
-    'stats': 'emma-davis',
-    'trends': 'kai-nakamura',
-    'brand': 'grace-sterling',
-    'voice': 'grace-sterling',
-    'editor': 'liam-foster',
-    'edit': 'liam-foster',
-    'inbox': 'ava-mitchell',
-    'assistant': 'ava-mitchell',
+    researcher: 'alex-morgan', research: 'alex-morgan',
+    blog: 'james-harper', article: 'james-harper', writer: 'james-harper',
+    linkedin: 'sophia-chen',
+    twitter: 'ryan-blake', tweet: 'ryan-blake', 'x post': 'ryan-blake',
+    instagram: 'maya-patel', reel: 'maya-patel',
+    youtube: 'ethan-cole', video: 'ethan-cole', script: 'ethan-cole',
+    newsletter: 'olivia-rhodes', email: 'olivia-rhodes',
+    repurpose: 'noah-bennett',
+    design: 'zara-kim', graphic: 'zara-kim', visual: 'zara-kim',
+    publish: 'lucas-wright', schedule: 'lucas-wright', calendar: 'lucas-wright',
+    analytics: 'emma-davis', stats: 'emma-davis', data: 'emma-davis',
+    trend: 'kai-nakamura', trends: 'kai-nakamura',
+    brand: 'grace-sterling', tone: 'grace-sterling',
+    editor: 'liam-foster', edit: 'liam-foster', proofread: 'liam-foster',
+    inbox: 'ava-mitchell', assistant: 'ava-mitchell', calendar: 'ava-mitchell',
   }
 
   for (const [keyword, empId] of Object.entries(roleKeywords)) {
     if (lower.includes(keyword)) {
-      const participant = participants.find(p => p.employee.id === empId)
-      if (participant) return empId
+      if (participants.find(p => p.employee.id === empId)) return empId
     }
   }
 
-  return 'all'
+  return null
 }
 
-async function callEmployeeVoiceAPI(
-  employeeId: string,
-  userMessage: string
-): Promise<string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'x-workspace-id': WORKSPACE_ID,
-  }
-
-  // For meeting voice mode, use a "brief response" system prompt variant
-  // Each employee gives a concise spoken response (not full content output)
+// ─── API CALL ─────────────────────────────────────────────────────────────────
+async function callVoiceAPI(employeeId: string, message: string): Promise<string> {
   try {
     const res = await fetch('/api/v1/voice/respond', {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ employee_id: employeeId, message: userMessage, mode: 'voice' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-workspace-id': WORKSPACE_ID,
+      },
+      body: JSON.stringify({ employee_id: employeeId, message, mode: 'meeting' }),
     })
     const data = await res.json()
-    if (data.success) return data.response
-  } catch {
-    // Fall through to basic response
+    if (data.success && data.response) return data.response
+    throw new Error(data.error || 'No response')
+  } catch (err) {
+    console.error(`Voice API failed for ${employeeId}:`, err)
+    // Personality-aware fallbacks that feel natural (used only if API completely fails)
+    const name = getEmployeeName(employeeId).split(' ')[0]
+    const fallbacks: Record<string, string> = {
+      'alex-morgan': `Hey! Good to be here. I've been deep in the keyword research this week — found some really interesting gaps we should talk about.`,
+      'james-harper': `Hey! Good timing. I've got a couple of blog drafts on the go and wanted to run an intro by you.`,
+      'sophia-chen': `Hey! I've actually been wanting to share something — that last post performed really well and I think I know why.`,
+      'ryan-blake': `Hey. Good timing. Got a take brewing that I think could actually do numbers.`,
+      'maya-patel': `Oh hey! I was just sketching out a Reel concept. Really glad we're syncing.`,
+      'ethan-cole': `Hey! I've been scripting something I'm genuinely excited about — good to be here.`,
+      'olivia-rhodes': `Hey, really glad to connect. The newsletter numbers from Tuesday are worth discussing.`,
+      'noah-bennett': `Hey! Good to sync. I've been building out a repurposing batch — got some good stuff queued.`,
+      'zara-kim': `Hey. I've got some visual concepts to share when you're ready. Been a productive week.`,
+      'lucas-wright': `Hey, good to be here. Publishing queue looks solid. A couple of things I want to flag.`,
+      'emma-davis': `Hey! I've been pulling data and there are a few things worth highlighting — some good, some worth watching.`,
+      'kai-nakamura': `Hey! Actually really good timing — I've been tracking something in the space worth discussing.`,
+      'grace-sterling': `Hello, good to connect. I've had some observations from reviewing this week's content.`,
+      'liam-foster': `Hey. Good week for edits. Got some patterns from the work that are worth sharing.`,
+      'ava-mitchell': `Hey! Good timing. I've got a few things flagged from your inbox and a calendar note to raise.`,
+    }
+    return fallbacks[employeeId] || `Hey ${name} here — good to be in the room. Ready when you are.`
   }
-
-  // Fallback: employee-specific brief responses
-  const name = getEmployeeName(employeeId).split(' ')[0]
-  const roleResponses: Record<string, string> = {
-    'alex-morgan': `Got it. I'll research that now. Give me a moment to pull together the key angles and keyword opportunities.`,
-    'james-harper': `On it. I'll draft the article structure and start writing. Should have something ready shortly.`,
-    'sophia-chen': `Perfect. I'll craft a LinkedIn post that positions this well for your audience. Just a moment.`,
-    'ryan-blake': `Let's go. I'll keep it tight and punchy — exactly how X likes it.`,
-    'maya-patel': `Love it. I'll write something that stops the scroll. Give me a second.`,
-    'ethan-cole': `Great angle. I'll script this so it hooks viewers in the first 30 seconds.`,
-    'olivia-rhodes': `Lovely. I'll write a newsletter edition that feels personal and delivers real value.`,
-    'noah-bennett': `Easy. Tell me what you have and I'll reshape it for every platform.`,
-    'zara-kim': `Visual brief received. I'll create something that's on-brand and eye-catching.`,
-    'lucas-wright': `Understood. I'll handle the publishing and scheduling across all connected channels.`,
-    'emma-davis': `I'll pull the performance data and give you a clear picture of what's working.`,
-    'kai-nakamura': `I'm scanning the landscape now. There are some interesting trends emerging in your space.`,
-    'grace-sterling': `I'll check the knowledge base and make sure this aligns with your brand voice and positioning.`,
-    'liam-foster': `Send it over. I'll check it for AI detection, readability, and brand consistency before it goes out.`,
-    'ava-mitchell': `On it. I'll check your inbox and calendar and give you a quick summary.`,
-  }
-
-  return roleResponses[employeeId] || `Thanks ${name === getEmployeeName(employeeId).split(' ')[0] ? '' : ', '}I'm working on that now.`
 }
 
+// ─── HOOK ─────────────────────────────────────────────────────────────────────
 export function useMeeting() {
   const [status, setStatus] = useState<MeetingStatus>('lobby')
   const [participants, setParticipants] = useState<MeetingParticipant[]>([])
   const [messages, setMessages] = useState<MeetingMessage[]>([])
   const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const speakQueueRef = useRef<Array<{ employeeId: string; text: string }>>([])
-  const isPlayingRef = useRef(false)
 
-  const startMeeting = useCallback((employeeIds: string[]) => {
-    const parts = employeeIds.map(id => {
-      const employee = EMPLOYEES.find(e => e.id === id)!
-      return { employee, isSpeaking: false, hasSpoken: false }
-    })
-    setParticipants(parts)
-    setMessages([])
-    setStatus('active')
-
-    // Welcome message — warm and human, from first participant
-    setTimeout(async () => {
-      const first = parts[0]
-      if (first) {
-        // Use the AI to generate a natural welcome rather than a hardcoded string
-        let welcomeText: string
-        try {
-          const res = await fetch('/api/v1/voice/respond', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-workspace-id': WORKSPACE_ID },
-            body: JSON.stringify({
-              employee_id: first.employee.id,
-              message: `The meeting is just starting. There are ${parts.length} team members in this meeting. Welcome everyone and let the founder know you're all ready. Keep it natural and brief.`,
-              mode: 'welcome',
-            }),
-          })
-          const data = await res.json()
-          welcomeText = data.success ? data.response : `Hey, welcome! Good to have everyone here. There are ${parts.length} of us on the call. Just say a name to direct something to someone, or talk to the group. What are we working on today?`
-        } catch {
-          welcomeText = `Hey, welcome! Good to have everyone here. There are ${parts.length} of us on the call. Just say a name to direct something to someone, or talk to the group. What are we working on today?`
-        }
-        addMessage(first.employee.id, welcomeText)
-        playVoice(first.employee.id, welcomeText)
-      }
-    }, 800)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const endMeeting = useCallback(() => {
-    stopSpeaking()
-    speakQueueRef.current = []
-    isPlayingRef.current = false
-    setActiveSpeakerId(null)
-    setStatus('ended')
-  }, [])
-
-  const addMessage = useCallback((from: string, text: string) => {
+  const addMessage = useCallback((from: string, text: string, intent?: string) => {
     setMessages(prev => [...prev, {
       id: `${Date.now()}-${Math.random()}`,
       from,
       text,
       timestamp: new Date(),
+      intent,
     }])
   }, [])
 
-  const playVoice = useCallback(async (employeeId: string, text: string) => {
-    speakQueueRef.current.push({ employeeId, text })
-    if (isPlayingRef.current) return
-
-    isPlayingRef.current = true
-    while (speakQueueRef.current.length > 0) {
-      const item = speakQueueRef.current.shift()!
-      setActiveSpeakerId(item.employeeId)
-      setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: p.employee.id === item.employeeId })))
-
-      const apiKey = localStorage.getItem('elevenlabs_api_key') || undefined
-      try {
-        await speakAsEmployee(item.employeeId, item.text, apiKey)
-      } catch (e) {
-        console.warn('Voice error:', e)
-      }
-
-      setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
-      setActiveSpeakerId(null)
+  const speakEmployee = useCallback(async (employeeId: string, text: string) => {
+    setActiveSpeakerId(employeeId)
+    setParticipants(prev => prev.map(p => ({
+      ...p,
+      isSpeaking: p.employee.id === employeeId,
+      hasSpoken: p.employee.id === employeeId ? true : p.hasSpoken,
+      lastMessage: p.employee.id === employeeId ? text : p.lastMessage,
+    })))
+    try {
+      await speakAsEmployee(employeeId, text)
+    } catch (e) {
+      console.warn('Speak error:', e)
     }
-    isPlayingRef.current = false
+    setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
+    setActiveSpeakerId(null)
+  }, [])
+
+  const startMeeting = useCallback(async (employeeIds: string[]) => {
+    const parts = employeeIds.map(id => ({
+      employee: EMPLOYEES.find(e => e.id === id)!,
+      isSpeaking: false,
+      hasSpoken: false,
+    }))
+    setParticipants(parts)
+    setMessages([])
+    setStatus('active')
+
+    // AI-generated natural welcome from the first employee
+    setTimeout(async () => {
+      const first = parts[0]
+      if (!first) return
+
+      const welcomePrompt = `The meeting is starting. There are ${parts.length} team members on this call: ${parts.map(p => p.employee.defaultName.split(' ')[0]).join(', ')}. You're the first to speak. Welcome the owner naturally — be warm, show your personality, and mention something you've been working on. Keep it brief, 2-3 sentences max.`
+
+      const welcomeText = await callVoiceAPI(first.employee.id, welcomePrompt)
+      addMessage(first.employee.id, welcomeText, 'greeting')
+
+      // Slight delay then speak
+      setTimeout(() => speakEmployee(first.employee.id, welcomeText), 300)
+    }, 600)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addMessage])
+
+  const endMeeting = useCallback(() => {
+    stopSpeaking()
+    setActiveSpeakerId(null)
+    setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
+    setStatus('ended')
   }, [])
 
   const sendMessage = useCallback(async (text: string) => {
@@ -268,75 +259,53 @@ export function useMeeting() {
     addMessage('user', text)
     setIsProcessing(true)
 
-    const addressed = detectAddressedEmployee(text, participants)
-    const lower = text.toLowerCase().trim()
+    const routingIntent = detectRoutingIntent(text)
+    const directlyAddressed = detectAddressedEmployee(text, participants)
 
-    // Detect casual conversation
-    const isCasual = /^(hi|hey|hello|hiya|yo|sup|what'?s up|howdy|good (morning|afternoon|evening)|how (are|is|you|everyone|it going)|thanks|thank you|cheers|great|awesome|cool|nice|what'?s new)/.test(lower)
+    try {
+      if (directlyAddressed) {
+        // ── Direct address: one employee responds ──
+        const response = await callVoiceAPI(directlyAddressed, text)
+        addMessage(directlyAddressed, response, routingIntent)
+        await speakEmployee(directlyAddressed, response)
 
-    if (addressed === 'all') {
-      // For casual messages, pick 1-2 social/outgoing employees
-      // For work broadcasts, pick up to 3 relevant employees
-      let responders = participants
-      if (isCasual) {
-        // Pick 1-2 employees — prefer social ones (Sophia, Maya, Ava, Olivia, Ethan)
-        const socialOrder = ['sophia-chen', 'maya-patel', 'ava-mitchell', 'olivia-rhodes', 'ethan-cole', 'kai-nakamura']
-        const sorted = [...participants].sort((a, b) => {
-          const ai = socialOrder.indexOf(a.employee.id)
-          const bi = socialOrder.indexOf(b.employee.id)
-          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-        })
-        responders = sorted.slice(0, 2)
+      } else if (routingIntent === 'standup') {
+        // ── Standup: everyone gives a brief status update in sequence ──
+        for (const p of participants) {
+          const statusPrompt = `The owner just asked: "${text}". Give your personal status update — what you've been working on, any wins or flags, keep it to 2-3 sentences. Be specific and human.`
+          const response = await callVoiceAPI(p.employee.id, statusPrompt)
+          addMessage(p.employee.id, response, 'status_request')
+          await speakEmployee(p.employee.id, response)
+          // Small pause between speakers
+          await new Promise(r => setTimeout(r, 300))
+        }
+
+      } else if (routingIntent === 'greeting') {
+        // ── Greeting: 2-3 employees respond naturally ──
+        const greeters = participants.slice(0, Math.min(3, participants.length))
+        for (const p of greeters) {
+          const response = await callVoiceAPI(p.employee.id, text)
+          addMessage(p.employee.id, response, 'greeting')
+          await speakEmployee(p.employee.id, response)
+          await new Promise(r => setTimeout(r, 200))
+        }
+
       } else {
-        responders = participants.slice(0, 3)
-      }
-
-      for (const p of responders) {
-        try {
-          const response = await callEmployeeVoiceAPI(p.employee.id, text)
-          addMessage(p.employee.id, response)
-          setParticipants(prev => prev.map(part => ({
-            ...part,
-            isSpeaking: part.employee.id === p.employee.id,
-            hasSpoken: part.employee.id === p.employee.id ? true : part.hasSpoken,
-            lastMessage: part.employee.id === p.employee.id ? response : part.lastMessage,
-          })))
-          setActiveSpeakerId(p.employee.id)
-          await speakAsEmployee(p.employee.id, response)
-          setParticipants(prev => prev.map(part => ({ ...part, isSpeaking: false })))
-          setActiveSpeakerId(null)
-        } catch (e) {
-          console.warn(e)
-          setParticipants(prev => prev.map(part => ({ ...part, isSpeaking: false })))
-          setActiveSpeakerId(null)
+        // ── Broadcast: top 2-3 most relevant employees respond ──
+        const responders = participants.slice(0, Math.min(3, participants.length))
+        for (const p of responders) {
+          const response = await callVoiceAPI(p.employee.id, text)
+          addMessage(p.employee.id, response, routingIntent)
+          await speakEmployee(p.employee.id, response)
+          await new Promise(r => setTimeout(r, 200))
         }
       }
-    } else {
-      const participant = participants.find(p => p.employee.id === addressed)
-      if (participant) {
-        try {
-          const response = await callEmployeeVoiceAPI(addressed, text)
-          addMessage(addressed, response)
-          setParticipants(prev => prev.map(p => ({
-            ...p,
-            isSpeaking: p.employee.id === addressed,
-            hasSpoken: p.employee.id === addressed ? true : p.hasSpoken,
-            lastMessage: p.employee.id === addressed ? response : p.lastMessage,
-          })))
-          setActiveSpeakerId(addressed)
-          await speakAsEmployee(addressed, response)
-          setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
-          setActiveSpeakerId(null)
-        } catch (e) {
-          console.warn(e)
-          setParticipants(prev => prev.map(p => ({ ...p, isSpeaking: false })))
-          setActiveSpeakerId(null)
-        }
-      }
+    } catch (e) {
+      console.error('Meeting sendMessage error:', e)
     }
 
     setIsProcessing(false)
-  }, [participants, isProcessing, addMessage])
+  }, [participants, isProcessing, addMessage, speakEmployee])
 
   return {
     status,

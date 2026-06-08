@@ -172,7 +172,7 @@ export default function VoiceInputBar({ onSend, isProcessing, isMeetingActive }:
       {/* Hint */}
       {isMeetingActive && (
         <p className="text-center text-[10px] text-[var(--muted-foreground)]">
-          💡 Address by name: <span className="font-medium">"Sophia, write me a LinkedIn post..."</span> · or speak to all: <span className="font-medium">"Team, what should we focus on today?"</span>
+          💡 Try: <span className="font-medium">"What&apos;s everyone&apos;s update?"</span> · <span className="font-medium">"Sophia, what performed well this week?"</span> · <span className="font-medium">"Emma, show me the analytics"</span> · <span className="font-medium">"James, write me a blog intro about AI"</span>
         </p>
       )}
     </div>

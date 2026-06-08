@@ -41,7 +41,7 @@ function MeetingLobby({ onStart }: { onStart: (ids: string[]) => void }) {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Voice Meeting Room</h1>
         <p className="text-[var(--muted-foreground)] mt-1">
-          Start a live voice meeting with your AI team. Speak naturally — address them by name or broadcast to everyone.
+          Your team is ready to join. Ask for updates, assign work, or just catch up — they know what they&apos;ve been working on and will report to you naturally.
         </p>
       </div>
 
