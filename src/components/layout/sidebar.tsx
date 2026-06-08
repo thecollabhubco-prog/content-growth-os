@@ -9,6 +9,7 @@ import { useEmployeeNames } from '@/hooks/use-employee-names'
 const NAV_TOP = [
   { href: '/dashboard', icon: '⚡', label: 'Command Center' },
   { href: '/team', icon: '👥', label: 'My Team' },
+  { href: '/meeting', icon: '🎙️', label: 'Voice Meeting' },
   { href: '/calendar', icon: '📅', label: 'Content Calendar' },
   { href: '/analytics', icon: '📊', label: 'Analytics' },
   { href: '/publishing', icon: '🔌', label: 'Connections' },

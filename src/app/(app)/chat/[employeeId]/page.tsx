@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useRef, useEffect, use } from 'react'
+import { useState, useRef, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { EMPLOYEES, getEmployee } from '@/lib/employees'
 import { useEmployeeNames } from '@/hooks/use-employee-names'
 import { cn, relativeTime } from '@/lib/utils'
 import Link from 'next/link'
+import { useVoice } from '@/hooks/useVoice'
+import { stopSpeaking } from '@/lib/elevenlabs'
 
 const WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
 
@@ -222,8 +224,23 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
   const [showRename, setShowRename] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [showProfile, setShowProfile] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Voice — auto-submit on transcript
+  const handleVoiceTranscript = useCallback((text: string) => {
+    if (text && employee) {
+      setInput(text)
+      // Small delay so input state updates
+      setTimeout(() => sendMessageText(text), 50)
+    }
+  }, [employee]) // eslint-disable-line
+
+  const { state: voiceState, isSupported: voiceSupported, startListening, stopListening, speak } = useVoice({
+    employeeId: employee?.id,
+    onTranscript: handleVoiceTranscript,
+  })
 
   const name = employee ? getName(employee.id) : 'Employee'
 
@@ -253,9 +270,9 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
     )
   }
 
-  async function sendMessage() {
-    if (!input.trim() || sending) return
-    const userMsg = input.trim()
+  async function sendMessageText(text: string) {
+    if (!text.trim() || sending) return
+    const userMsg = text.trim()
     setInput('')
     setSending(true)
 
@@ -278,15 +295,29 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
     const result = await callEmployeeAPI(employee!.id, userMsg)
 
     setMessages(prev => prev.map(m =>
-      m.isLoading ? {
-        ...m,
-        content: result.content,
-        metadata: result.metadata,
-        isLoading: false,
-      } : m
+      m.isLoading ? { ...m, content: result.content, metadata: result.metadata, isLoading: false } : m
     ))
     setSending(false)
+
+    // Auto-speak response if voice enabled
+    if (voiceEnabled && result.content) {
+      speak(result.content)
+    }
+
     inputRef.current?.focus()
+  }
+
+  async function sendMessage() {
+    sendMessageText(input)
+  }
+
+  function handleVoiceMicClick() {
+    if (voiceState === 'listening') {
+      stopListening()
+    } else {
+      stopSpeaking()
+      startListening()
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -320,6 +351,19 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
             </div>
             <p className={cn('text-xs', employee.color)}>{employee.role}</p>
           </div>
+          {/* Voice toggle */}
+          <button
+            onClick={() => setVoiceEnabled(v => !v)}
+            title={voiceEnabled ? 'Disable voice replies' : 'Enable voice replies'}
+            className={cn(
+              'flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg transition shrink-0',
+              voiceEnabled
+                ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]'
+                : 'border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]'
+            )}
+          >
+            🎙️ {voiceEnabled ? 'Voice On' : 'Voice Off'}
+          </button>
           <button
             onClick={() => setShowProfile(true)}
             className="text-xs border border-[var(--border)] px-3 py-1.5 rounded-lg hover:bg-[var(--muted)] transition text-[var(--muted-foreground)] shrink-0"
@@ -370,8 +414,42 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
         </div>
 
         {/* Input Area */}
-        <div className="px-5 py-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0">
+        <div className="px-5 py-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0 space-y-2">
+          {/* Voice listening indicator */}
+          {voiceState === 'listening' && (
+            <div className="flex items-center justify-center gap-2 py-1">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="w-1 bg-[var(--primary)] rounded-full"
+                  style={{ height: `${8 + i * 3}px`, animation: `audioBar 0.${3+i}s ease-in-out infinite alternate` }} />
+              ))}
+              <span className="text-xs text-[var(--primary)] font-medium ml-1 animate-pulse">Listening...</span>
+            </div>
+          )}
+          {voiceState === 'speaking' && (
+            <div className="flex items-center justify-center gap-2 py-1">
+              <span className="text-xs text-emerald-500 font-medium animate-pulse">🔊 {name} is speaking...</span>
+              <button onClick={() => stopSpeaking()} className="text-[10px] text-[var(--muted-foreground)] underline">Stop</button>
+            </div>
+          )}
+
           <div className="flex gap-3 items-end">
+            {/* Mic button */}
+            {voiceSupported && (
+              <button
+                onClick={handleVoiceMicClick}
+                disabled={sending || voiceState === 'speaking'}
+                title={voiceState === 'listening' ? 'Stop listening' : 'Speak to ' + name}
+                className={cn(
+                  'w-11 h-11 rounded-xl flex items-center justify-center transition shrink-0 border',
+                  voiceState === 'listening'
+                    ? 'bg-red-500 text-white border-red-500 animate-pulse'
+                    : 'border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
+                )}
+              >
+                {voiceState === 'listening' ? '⏹' : '🎙️'}
+              </button>
+            )}
+
             <textarea
               ref={inputRef}
               value={input}
@@ -403,8 +481,8 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
               )}
             </button>
           </div>
-          <p className="text-[10px] text-[var(--muted-foreground)] mt-2 text-center">
-            Press Enter to send · Shift+Enter for new line
+          <p className="text-[10px] text-[var(--muted-foreground)] text-center">
+            {voiceEnabled ? '🎙️ Voice replies enabled · Click mic to speak' : 'Press Enter to send · Shift+Enter for new line · Click 🎙️ Voice Off to enable voice'}
           </p>
         </div>
       </div>
