@@ -158,8 +158,9 @@ async function callVoiceAPI(employeeId: string, message: string): Promise<string
       body: JSON.stringify({ employee_id: employeeId, message, mode: 'meeting' }),
     })
     const data = await res.json()
-    if (data.success && data.response) return data.response
-    throw new Error(data.error || 'No response')
+    // ok() wraps in { success, data: { response, ... } }
+    if (data.success && data.data?.response) return data.data.response as string
+    throw new Error(data.error?.message || 'No response')
   } catch (err) {
     console.error(`Voice API failed for ${employeeId}:`, err)
     // Personality-aware fallbacks that feel natural (used only if API completely fails)

@@ -238,7 +238,8 @@ MEETING RULES — ALWAYS FOLLOW:
 
     return ok({ response: cleaned, employee_id, mode, intent })
   } catch (error) {
-    console.error('Voice respond error:', error)
-    return Errors.internal('Failed to generate voice response')
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('Voice respond error:', msg)
+    return Errors.internal(`Voice error: ${msg}`)
   }
 }
