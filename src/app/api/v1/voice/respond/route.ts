@@ -220,6 +220,7 @@ MEETING RULES — ALWAYS FOLLOW:
     }
 
     const result = await generate({
+      model: 'anthropic/claude-3.5-haiku', // fast + cheap for voice responses
       systemPrompt: systemPrompt + intentHint,
       userPrompt: message,
       maxTokens: intent === 'task_assignment' ? 400 : 200,

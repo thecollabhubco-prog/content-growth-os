@@ -1,8 +1,10 @@
 import { logger } from '@/lib/logger'
 
 export type OpenRouterModel =
-  | 'anthropic/claude-3.5-sonnet'
-  | 'anthropic/claude-3-haiku'
+  | 'anthropic/claude-sonnet-4.5'
+  | 'anthropic/claude-3.5-haiku'
+  | 'anthropic/claude-haiku-4.5'
+  | 'anthropic/claude-sonnet-4.6'
   | 'openai/gpt-4o'
   | 'openai/gpt-4o-mini'
   | 'google/gemini-pro-1.5'
@@ -23,7 +25,7 @@ export interface GenerateResult {
   tokensUsed: number
 }
 
-const DEFAULT_MODEL: OpenRouterModel = 'anthropic/claude-3.5-sonnet'
+const DEFAULT_MODEL: OpenRouterModel = 'anthropic/claude-3.5-haiku'
 
 export async function generate(options: GenerateOptions): Promise<GenerateResult> {
   const {
