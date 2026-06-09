@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database.types'
 
 // Service role client — only for server-side operations that bypass RLS
+// Intentionally untyped so any table name works (no-auth architecture)
 export function createAdminClient() {
-  return createClient<Database>(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
