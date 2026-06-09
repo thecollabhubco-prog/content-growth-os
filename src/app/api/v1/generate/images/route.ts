@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { ok, Errors } from '@/lib/utils/api'
 import { logger } from '@/lib/logger'
 
@@ -42,9 +41,6 @@ const platformSizes: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return Errors.unauthorized()
 
     const body = await request.json()
     const {

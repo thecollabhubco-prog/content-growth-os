@@ -3,6 +3,52 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      conversations: {
+        Row: {
+          id: string
+          workspace_id: string
+          employee_id: string
+          title: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          employee_id: string
+          title?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string | null
+          updated_at?: string
+        }
+      }
+      chat_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          workspace_id: string
+          role: 'user' | 'assistant'
+          content: string
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          workspace_id: string
+          role: 'user' | 'assistant'
+          content: string
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          content?: string
+          metadata?: Json
+        }
+      }
       workspaces: {
         Row: {
           id: string

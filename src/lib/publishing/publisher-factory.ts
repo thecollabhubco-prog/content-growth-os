@@ -2,14 +2,16 @@ import { decrypt } from '@/lib/encryption/tokens'
 import { WordPressAdapter } from './wordpress'
 import { LinkedInAdapter } from './linkedin'
 import { XAdapter } from './x'
+import { InstagramAdapter } from './instagram'
 import type { PublisherInterface } from './interface'
 import type { Tables } from '@/types/database.types'
 
 type PlatformConnection = Tables<'platform_connections'>
 
 export function createPublisher(connection: PlatformConnection): PublisherInterface {
+  const raw = connection.credentials_encrypted
   const creds = JSON.parse(
-    decrypt(JSON.stringify(connection.credentials_encrypted))
+    decrypt(typeof raw === 'string' ? raw : JSON.stringify(raw))
   ) as Record<string, string>
 
   switch (connection.platform) {
@@ -29,7 +31,14 @@ export function createPublisher(connection: PlatformConnection): PublisherInterf
     case 'x':
       return new XAdapter({
         accessToken: creds.accessToken,
-        accessTokenSecret: creds.accessTokenSecret,
+        accessTokenSecret: creds.accessTokenSecret || '',
+      })
+
+    case 'instagram':
+      return new InstagramAdapter({
+        accessToken: creds.accessToken,
+        igAccountId: creds.igAccountId,
+        pageId: creds.pageId,
       })
 
     default:

@@ -1,83 +1,122 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createTypedAdminClient, from } from '@/lib/supabase/typed'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ok, Errors } from '@/lib/utils/api'
 
+const DEFAULT_WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
+
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return Errors.unauthorized()
-
-  const workspaceId = request.headers.get('x-workspace-id')
-  if (!workspaceId) return Errors.validation('x-workspace-id header required')
-
+  const workspaceId = request.headers.get('x-workspace-id') || DEFAULT_WORKSPACE_ID
   const { searchParams } = new URL(request.url)
-  const platform = searchParams.get('platform')
   const days = parseInt(searchParams.get('days') || '30')
 
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
-  const startStr = startDate.toISOString().split('T')[0]
+  const startStr = startDate.toISOString()
 
-  const db = createTypedAdminClient()
+  const db = createAdminClient()
 
-  // Get performance data
-  let query = from(db, 'content_performance')
-    .select('*')
+  // All content items created in this period
+  const { data: items, error } = await db
+    .from('content_items')
+    .select('id, platform, type, status, word_count, reading_time_minutes, created_at, published_at, tags')
     .eq('workspace_id', workspaceId)
-    .gte('metrics_date', startStr)
-    .order('metrics_date', { ascending: false })
+    .gte('created_at', startStr)
+    .order('created_at', { ascending: false })
 
-  if (platform) query = query.eq('platform', platform)
+  if (error) return Errors.internal(error.message)
 
-  const { data: performance, error } = await query
-  if (error) return Errors.internal()
+  const all = items || []
 
-  // Aggregate by platform
+  // ── By-platform breakdown ─────────────────────────────────────────────────
   const byPlatform: Record<string, {
-    impressions: number
-    reach: number
-    clicks: number
-    likes: number
-    comments: number
-    shares: number
-    posts: number
-    avg_engagement_rate: number
+    total: number
+    published: number
+    draft: number
+    scheduled: number
+    word_count: number
+    types: string[]
   }> = {}
 
-  for (const row of (performance || [])) {
-    const p = row.platform
-    if (!byPlatform[p]) {
-      byPlatform[p] = { impressions: 0, reach: 0, clicks: 0, likes: 0, comments: 0, shares: 0, posts: 0, avg_engagement_rate: 0 }
-    }
-    byPlatform[p].impressions += row.impressions
-    byPlatform[p].reach += row.reach
-    byPlatform[p].clicks += row.clicks
-    byPlatform[p].likes += row.likes
-    byPlatform[p].comments += row.comments
-    byPlatform[p].shares += row.shares
-    byPlatform[p].posts += 1
-    byPlatform[p].avg_engagement_rate += row.engagement_rate || 0
+  for (const item of all) {
+    const p = item.platform || 'internal'
+    if (!byPlatform[p]) byPlatform[p] = { total: 0, published: 0, draft: 0, scheduled: 0, word_count: 0, types: [] }
+    byPlatform[p].total++
+    if (item.status === 'published') byPlatform[p].published++
+    if (item.status === 'draft' || item.status === 'review') byPlatform[p].draft++
+    if (item.status === 'scheduled') byPlatform[p].scheduled++
+    byPlatform[p].word_count += item.word_count || 0
+    if (!byPlatform[p].types.includes(item.type)) byPlatform[p].types.push(item.type)
   }
 
-  // Average engagement rate
-  for (const p of Object.keys(byPlatform)) {
-    if (byPlatform[p].posts > 0) {
-      byPlatform[p].avg_engagement_rate /= byPlatform[p].posts
-    }
+  // ── Status breakdown ──────────────────────────────────────────────────────
+  const byStatus: Record<string, number> = {}
+  for (const item of all) {
+    byStatus[item.status] = (byStatus[item.status] || 0) + 1
   }
 
-  // Get published content count
-  const { data: contentCount } = await from(db, 'content_items')
-    .select('platform, status')
-    .eq('workspace_id', workspaceId)
-    .eq('status', 'published')
-    .gte('published_at', startDate.toISOString())
+  // ── Daily output (last N days, grouped by date) ───────────────────────────
+  const dailyMap: Record<string, number> = {}
+  for (const item of all) {
+    const d = item.created_at.slice(0, 10)
+    dailyMap[d] = (dailyMap[d] || 0) + 1
+  }
+  // Build contiguous date array
+  const daily: { date: string; count: number }[] = []
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    daily.push({ date: key, count: dailyMap[key] || 0 })
+  }
+
+  // ── Published items over time ─────────────────────────────────────────────
+  const publishedItems = all.filter(i => i.status === 'published' && i.published_at)
+  const publishedByDay: Record<string, number> = {}
+  for (const item of publishedItems) {
+    const d = item.published_at!.slice(0, 10)
+    publishedByDay[d] = (publishedByDay[d] || 0) + 1
+  }
+
+  // ── Top tags ──────────────────────────────────────────────────────────────
+  const tagCount: Record<string, number> = {}
+  for (const item of all) {
+    for (const tag of item.tags || []) {
+      tagCount[tag] = (tagCount[tag] || 0) + 1
+    }
+  }
+  const topTags = Object.entries(tagCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([tag, count]) => ({ tag, count }))
+
+  // ── Totals ────────────────────────────────────────────────────────────────
+  const totalWords = all.reduce((s, i) => s + (i.word_count || 0), 0)
+  const totalPublished = all.filter(i => i.status === 'published').length
+  const totalGenerated = all.length
+  const avgWordsPerPiece = totalGenerated > 0 ? Math.round(totalWords / totalGenerated) : 0
+
+  // ── Publishing velocity (pieces per day) ─────────────────────────────────
+  const velocity = +(totalGenerated / days).toFixed(2)
 
   return ok({
     period_days: days,
+    totals: {
+      generated: totalGenerated,
+      published: totalPublished,
+      words_written: totalWords,
+      avg_words_per_piece: avgWordsPerPiece,
+      pieces_per_day: velocity,
+    },
     by_platform: byPlatform,
-    total_published: contentCount?.length || 0,
-    raw_performance: performance?.slice(0, 100),
+    by_status: byStatus,
+    daily_output: daily,
+    top_tags: topTags,
+    recent_items: all.slice(0, 10).map(i => ({
+      id: i.id,
+      platform: i.platform,
+      type: i.type,
+      status: i.status,
+      created_at: i.created_at,
+    })),
   })
 }

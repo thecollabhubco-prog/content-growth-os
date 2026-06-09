@@ -1,34 +1,28 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createTypedAdminClient, from } from '@/lib/supabase/typed'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ok, Errors } from '@/lib/utils/api'
 import { GmailClient } from '@/lib/google/gmail'
 import { getValidAccessToken } from '@/lib/google/oauth'
 import { generate } from '@/lib/ai/openrouter'
 import { logger } from '@/lib/logger'
 
+const DEFAULT_WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
+
 // Natural language search — converts plain English to Gmail query syntax
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return Errors.unauthorized()
-
-    const workspaceId = request.headers.get('x-workspace-id')
-    if (!workspaceId) return Errors.validation('x-workspace-id header required')
-
+    const workspaceId = request.headers.get('x-workspace-id') || DEFAULT_WORKSPACE_ID
     const body = await request.json()
     const { query, natural_language = false, max_results = 20 } = body
 
     if (!query) return Errors.validation('query is required')
 
-    let gmailQuery = query
+    let gmailQuery = query as string
 
     if (natural_language) {
-      // Convert natural language to Gmail query syntax
       const result = await generate({
-        model: 'anthropic/claude-3-haiku',
-        systemPrompt: 'Convert natural language email search queries to Gmail search syntax. Return ONLY the Gmail query string, nothing else.',
+        model: 'anthropic/claude-3.5-haiku',
+        systemPrompt: 'Convert natural language email search queries to Gmail search syntax. Return ONLY the Gmail query string, nothing else. No explanation.',
         userPrompt: `Convert to Gmail search syntax: "${query}"\n\nExamples:\n- "unread emails from last week" → "is:unread newer_than:7d"\n- "emails from john about invoices" → "from:john subject:invoice"\n- "emails with attachments" → "has:attachment"\n\nReturn only the Gmail query string.`,
         maxTokens: 100,
         temperature: 0.1,
@@ -36,15 +30,19 @@ export async function POST(request: NextRequest) {
       gmailQuery = result.content.trim().replace(/^["']|["']$/g, '')
     }
 
-    const db = createTypedAdminClient()
-    const { data: connection } = await from(db, 'google_connections')
+    const db = createAdminClient()
+    const { data: connection } = await db
+      .from('google_connections')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
       .eq('is_active', true)
+      .order('last_sync_at', { ascending: false })
+      .limit(1)
       .single()
 
-    if (!connection) return Errors.notFound('Google connection')
+    if (!connection) {
+      return Errors.notFound('Google connection. Connect Gmail in Publishing settings.')
+    }
 
     const accessToken = await getValidAccessToken(connection.id)
     const gmail = new GmailClient(accessToken)
