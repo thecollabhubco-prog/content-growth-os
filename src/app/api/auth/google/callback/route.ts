@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
     const googleUser = await getGoogleUserInfo(tokens.access_token)
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
-    const db = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = createAdminClient() as any
 
     // Try upsert on google_user_id + workspace_id
     const { data: existing } = await db
