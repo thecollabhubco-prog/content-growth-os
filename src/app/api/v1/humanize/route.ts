@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Analyze
     const analysisResult = await generate({
-      model: 'anthropic/claude-3-haiku',
+      model: 'anthropic/claude-3.5-haiku',
       systemPrompt: 'You are an AI content quality analyzer. Return only valid JSON.',
       userPrompt: getHumanizationAnalysisPrompt(originalContent),
       temperature: 0.1,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Rewrite if needed
     if (auto_rewrite && (analysis.rewrite_required || analysis.overall_score < 0.7)) {
       const rewriteResult = await generate({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: 'anthropic/claude-sonnet-4.5',
         systemPrompt: 'You are an expert editor. Rewrite content to sound natural and human.',
         userPrompt: getHumanizationRewritePrompt(originalContent, analysis.issues),
         temperature: 0.8,

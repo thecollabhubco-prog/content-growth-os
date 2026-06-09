@@ -65,8 +65,8 @@ export async function saveMessage(
       workspace_id: workspaceId,
       role,
       content,
-      metadata,
-    } satisfies MessageInsert)
+      metadata: metadata as MessageInsert['metadata'],
+    })
     .select('*')
     .single()
 

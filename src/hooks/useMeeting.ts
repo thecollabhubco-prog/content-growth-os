@@ -134,7 +134,7 @@ function detectAddressedEmployee(text: string, participants: MeetingParticipant[
     trend: 'kai-nakamura', trends: 'kai-nakamura',
     brand: 'grace-sterling', tone: 'grace-sterling',
     editor: 'liam-foster', edit: 'liam-foster', proofread: 'liam-foster',
-    inbox: 'ava-mitchell', assistant: 'ava-mitchell', calendar: 'ava-mitchell',
+    inbox: 'ava-mitchell', assistant: 'ava-mitchell',
   }
 
   for (const [keyword, empId] of Object.entries(roleKeywords)) {
