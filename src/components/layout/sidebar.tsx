@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { EMPLOYEES } from '@/lib/employees'
 import { useEmployeeNames } from '@/hooks/use-employee-names'
 import WorkspaceSwitcher from './workspace-switcher'
+import ProjectSelector from './project-selector'
 
 const NAV_TOP = [
   { href: '/dashboard', icon: '⚡', label: 'Command Center' },
@@ -42,9 +43,12 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Workspace Switcher */}
+      {/* Workspace Switcher + Project Selector */}
       <div className="border-b border-[var(--border)]">
         <WorkspaceSwitcher />
+        <div className="border-t border-[var(--border)]/50">
+          <ProjectSelector />
+        </div>
       </div>
 
       {/* Top Nav */}

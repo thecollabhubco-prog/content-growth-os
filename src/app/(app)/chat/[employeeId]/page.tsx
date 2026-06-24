@@ -97,11 +97,13 @@ function getPlaceholder(employeeId: string, name: string): string {
 async function callEmployeeAPI(
   employeeId: string,
   userMessage: string,
-  workspaceId: string
+  workspaceId: string,
+  activeProject?: string | null
 ): Promise<{ content: string; metadata?: Record<string, unknown> }> {
   const headers = {
     'Content-Type': 'application/json',
     'x-workspace-id': workspaceId,
+    ...(activeProject ? { 'x-project': activeProject } : {}),
   }
 
   try {
@@ -263,7 +265,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
   const { employeeId } = use(params)
   const employee = getEmployee(employeeId)
   const { getName, updateName, resetName } = useEmployeeNames()
-  const { workspaceId, workspace } = useWorkspace()
+  const { workspaceId, workspace, activeProjectId, activeProjectName } = useWorkspace()
   const [messages, setMessages] = useState<Message[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [historyLoaded, setHistoryLoaded] = useState(false)
@@ -349,7 +351,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
 
     setMessages(prev => [...prev, userMessage, loadingMessage])
 
-    const result = await callEmployeeAPI(employee!.id, userMsg, workspaceId)
+    const result = await callEmployeeAPI(employee!.id, userMsg, workspaceId, activeProjectName)
 
     setMessages(prev => prev.map(m =>
       m.isLoading ? { ...m, content: result.content, metadata: result.metadata, isLoading: false } : m
@@ -412,7 +414,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
             </div>
             <p className={cn('text-xs', employee.color)}>{employee.role}</p>
             <p className="text-[10px] text-[var(--muted-foreground)] truncate" style={{ color: workspace.color }}>
-              {workspace.name}
+              {workspace.name}{activeProjectName ? ` · ${activeProjectName}` : ''}
             </p>
           </div>
           {/* Voice toggle */}
