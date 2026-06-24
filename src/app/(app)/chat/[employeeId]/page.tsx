@@ -8,16 +8,17 @@ import { cn, relativeTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useVoice } from '@/hooks/useVoice'
 import { stopSpeaking } from '@/lib/elevenlabs'
+import { useWorkspace } from '@/lib/workspace/context'
 
-const WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
+const DEFAULT_WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
 
 // ─── DB persistence helpers ────────────────────────────────────────────────
-async function loadChatHistory(employeeId: string): Promise<{
+async function loadChatHistory(employeeId: string, workspaceId: string): Promise<{
   conversationId: string | null
   messages: Message[]
 }> {
   try {
-    const res = await fetch(`/api/v1/conversations/${employeeId}?workspace_id=${WORKSPACE_ID}`)
+    const res = await fetch(`/api/v1/conversations/${employeeId}?workspace_id=${workspaceId}`)
     const data = await res.json()
     if (!data.success) return { conversationId: null, messages: [] }
     const { conversation, messages: raw } = data.data
@@ -40,13 +41,14 @@ async function persistMessage(
   employeeId: string,
   role: 'user' | 'assistant',
   content: string,
+  workspaceId: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
   try {
     await fetch(`/api/v1/conversations/${employeeId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, content, metadata, workspace_id: WORKSPACE_ID }),
+      body: JSON.stringify({ role, content, metadata, workspace_id: workspaceId }),
     })
   } catch {
     // non-fatal — UI still works even if DB write fails
@@ -94,11 +96,12 @@ function getPlaceholder(employeeId: string, name: string): string {
 
 async function callEmployeeAPI(
   employeeId: string,
-  userMessage: string
+  userMessage: string,
+  workspaceId: string
 ): Promise<{ content: string; metadata?: Record<string, unknown> }> {
   const headers = {
     'Content-Type': 'application/json',
-    'x-workspace-id': WORKSPACE_ID,
+    'x-workspace-id': workspaceId,
   }
 
   try {
@@ -260,6 +263,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
   const { employeeId } = use(params)
   const employee = getEmployee(employeeId)
   const { getName, updateName, resetName } = useEmployeeNames()
+  const { workspaceId, workspace } = useWorkspace()
   const [messages, setMessages] = useState<Message[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [historyLoaded, setHistoryLoaded] = useState(false)
@@ -296,7 +300,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
   useEffect(() => {
     if (!employee || historyLoaded) return
     setHistoryLoaded(true)
-    loadChatHistory(employee.id).then(({ conversationId: cid, messages: history }) => {
+    loadChatHistory(employee.id, workspaceId).then(({ conversationId: cid, messages: history }) => {
       if (cid) setConversationId(cid)
       if (history.length > 0) {
         setMessages(history)
@@ -345,7 +349,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
 
     setMessages(prev => [...prev, userMessage, loadingMessage])
 
-    const result = await callEmployeeAPI(employee!.id, userMsg)
+    const result = await callEmployeeAPI(employee!.id, userMsg, workspaceId)
 
     setMessages(prev => prev.map(m =>
       m.isLoading ? { ...m, content: result.content, metadata: result.metadata, isLoading: false } : m
@@ -353,8 +357,8 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
     setSending(false)
 
     // Persist both messages to DB (fire-and-forget)
-    persistMessage(employee!.id, 'user', userMsg)
-    persistMessage(employee!.id, 'assistant', result.content, result.metadata || {})
+    persistMessage(employee!.id, 'user', userMsg, workspaceId)
+    persistMessage(employee!.id, 'assistant', result.content, workspaceId, result.metadata || {})
 
     // Auto-speak response if voice enabled
     if (voiceEnabled && result.content) {
@@ -407,6 +411,9 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
               </button>
             </div>
             <p className={cn('text-xs', employee.color)}>{employee.role}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)] truncate" style={{ color: workspace.color }}>
+              {workspace.name}
+            </p>
           </div>
           {/* Voice toggle */}
           <button
@@ -424,7 +431,7 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
           <button
             onClick={async () => {
               if (!confirm('Clear chat history with ' + name + '?')) return
-              await fetch(`/api/v1/conversations/${employee.id}?workspace_id=${WORKSPACE_ID}`, { method: 'DELETE' })
+              await fetch(`/api/v1/conversations/${employee.id}?workspace_id=${workspaceId}`, { method: 'DELETE' })
               setConversationId(null)
               setHistoryLoaded(false)
               setMessages([{

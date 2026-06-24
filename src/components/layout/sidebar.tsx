@@ -5,10 +5,13 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { EMPLOYEES } from '@/lib/employees'
 import { useEmployeeNames } from '@/hooks/use-employee-names'
+import WorkspaceSwitcher from './workspace-switcher'
 
 const NAV_TOP = [
   { href: '/dashboard', icon: '⚡', label: 'Command Center' },
   { href: '/team', icon: '👥', label: 'My Team' },
+  { href: '/business', icon: '🏢', label: 'Business Memory' },
+  { href: '/stories', icon: '📖', label: 'My Stories' },
   { href: '/meeting', icon: '🎙️', label: 'Voice Meeting' },
   { href: '/calendar', icon: '📅', label: 'Content Calendar' },
   { href: '/analytics', icon: '📊', label: 'Analytics' },
@@ -30,13 +33,18 @@ export default function Sidebar() {
   return (
     <aside className="w-[var(--sidebar-width)] shrink-0 border-r border-[var(--border)] bg-[var(--card)] flex flex-col h-full overflow-y-auto">
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-[var(--border)]">
+      <div className="px-4 py-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center shrink-0">
             <span className="text-white text-xs font-bold">CG</span>
           </div>
           <span className="font-semibold text-sm truncate">Content Growth OS</span>
         </div>
+      </div>
+
+      {/* Workspace Switcher */}
+      <div className="border-b border-[var(--border)]">
+        <WorkspaceSwitcher />
       </div>
 
       {/* Top Nav */}
