@@ -86,6 +86,11 @@ const errorMessages: Record<string, string> = {
   linkedin_denied: 'LinkedIn authorization was cancelled.',
   x_denied: 'X authorization was cancelled.',
   instagram_denied: 'Instagram authorization was cancelled.',
+  wordpress_invalid_site_url: 'Enter a valid WordPress site URL (e.g. https://yoursite.com).',
+  wordpress_denied: 'WordPress authorization was cancelled.',
+  wordpress_invalid_credentials: "WordPress approved the connection but the credentials didn't work. Try again or connect manually.",
+  wordpress_verify_failed: 'Could not verify the WordPress connection. Check the site is reachable and try again.',
+  wordpress_save_failed: 'WordPress connected but saving the connection failed. Try again.',
 }
 
 function PublishingContent() {
@@ -104,6 +109,8 @@ function PublishingContent() {
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [n8nUrl, setN8nUrl] = useState('')
   const [n8nSaved, setN8nSaved] = useState(false)
+  const [wpSiteUrl, setWpSiteUrl] = useState('')
+  const [wpManualMode, setWpManualMode] = useState(false)
 
   useEffect(() => {
     loadConnections()
@@ -160,6 +167,12 @@ function PublishingContent() {
     localStorage.setItem('n8n_webhook_url', n8nUrl.trim())
     setN8nSaved(true)
     setTimeout(() => setN8nSaved(false), 2000)
+  }
+
+  function connectWordPressViaLogin() {
+    const site = wpSiteUrl.trim()
+    if (!site) return
+    window.location.href = `/api/v1/connections/wordpress?site_url=${encodeURIComponent(site)}&workspace_id=${workspaceId}`
   }
 
   // YouTube rides on the same Google OAuth connection as Gmail/Calendar/Drive —
@@ -243,7 +256,12 @@ function PublishingContent() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => { setConnectingPlatform(isExpanding ? null : platform); setCredentials({}) }}
+                      onClick={() => {
+                        setConnectingPlatform(isExpanding ? null : platform)
+                        setCredentials({})
+                        setWpManualMode(false)
+                        setWpSiteUrl('')
+                      }}
                       className="text-sm bg-[var(--primary)] text-white px-4 py-2 rounded-lg hover:opacity-90 transition"
                     >
                       {isExpanding ? 'Cancel' : 'Connect'}
@@ -252,8 +270,74 @@ function PublishingContent() {
                 </div>
               </div>
 
-              {/* Credentials form (WordPress) */}
-              {isExpanding && platform.type === 'credentials' && (
+              {/* WordPress: log in on your own site, no Application Password to create by hand */}
+              {isExpanding && platform.id === 'wordpress' && !wpManualMode && (
+                <div className="mt-5 pt-5 border-t border-[var(--border)] space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-[var(--muted-foreground)]">Your WordPress site URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://yoursite.com"
+                      value={wpSiteUrl}
+                      onChange={e => setWpSiteUrl(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') connectWordPressViaLogin() }}
+                      className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
+                    />
+                  </div>
+                  <button
+                    onClick={connectWordPressViaLogin}
+                    disabled={!wpSiteUrl.trim()}
+                    className="w-full bg-[var(--primary)] text-white py-2.5 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition"
+                  >
+                    Log in via WordPress →
+                  </button>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    You&apos;ll be taken to your own site&apos;s login page — enter your normal WordPress username and password there, then approve the connection. Nothing to create by hand.
+                  </p>
+                  <button
+                    onClick={() => setWpManualMode(true)}
+                    className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] underline"
+                  >
+                    Or connect manually with an Application Password
+                  </button>
+                </div>
+              )}
+
+              {/* WordPress manual fallback (also used if authorize-application.php is blocked on some hosts) */}
+              {isExpanding && platform.id === 'wordpress' && wpManualMode && (
+                <div className="mt-5 pt-5 border-t border-[var(--border)] space-y-3">
+                  {platform.fields?.map(field => (
+                    <div key={field.name}>
+                      <label className="block text-xs font-medium mb-1 text-[var(--muted-foreground)]">{field.label}</label>
+                      <input
+                        type={field.type}
+                        placeholder={field.placeholder}
+                        value={credentials[field.name] || ''}
+                        onChange={e => setCredentials(prev => ({ ...prev, [field.name]: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
+                      />
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => saveCredentials(platform)}
+                      disabled={saving}
+                      className="flex-1 bg-[var(--primary)] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition"
+                    >
+                      {saving ? 'Connecting...' : 'Save connection'}
+                    </button>
+                    <button
+                      onClick={() => setWpManualMode(false)}
+                      className="px-4 py-2 border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--muted)] transition"
+                    >
+                      Back
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Credentials form (other credential-based platforms, if any) */}
+              {isExpanding && platform.type === 'credentials' && platform.id !== 'wordpress' && (
                 <div className="mt-5 pt-5 border-t border-[var(--border)] space-y-3">
                   {platform.fields?.map(field => (
                     <div key={field.name}>
