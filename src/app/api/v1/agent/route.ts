@@ -10,9 +10,31 @@ import { performResearch } from '@/lib/research/pipeline'
 import { logger } from '@/lib/logger'
 
 // The agent may run research (web search + LLM synthesis) inline — allow 60s.
+// 60 is a HARD ceiling on Vercel's Hobby plan; it cannot be raised. Anything
+// that overruns is killed by the platform, which then returns a plain-text
+// error page instead of JSON. Hence the internal deadline below.
 export const maxDuration = 60
 
+// Leave headroom inside maxDuration so we can still write the reply to the DB
+// and return valid JSON rather than being killed mid-flight.
+const SOFT_DEADLINE_MS = 45_000
+
 const DEFAULT_WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
+
+/** Resolves to `null` if the work outruns the remaining request budget. */
+async function withDeadline<T>(work: Promise<T>, startedAt: number): Promise<T | null> {
+  const remaining = SOFT_DEADLINE_MS - (Date.now() - startedAt)
+  if (remaining <= 0) return null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      work,
+      new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), remaining) }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
 
 type PlannerAction =
   | 'reply' | 'research' | 'generate_content' | 'publish' | 'publish_content'
@@ -156,6 +178,7 @@ async function respond(
 // Main handler
 // ─────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
   try {
     const { origin } = new URL(request.url)
     const workspaceId = request.headers.get('x-workspace-id') || DEFAULT_WORKSPACE_ID
@@ -228,7 +251,11 @@ export async function POST(request: NextRequest) {
       case 'research': {
         const query = String(plan_.params.query || message)
         const type = ['url', 'keyword', 'topic'].includes(String(plan_.params.type)) ? String(plan_.params.type) : 'topic'
-        const outcome = await performResearch(workspaceId, query, type, query)
+        const outcome = await withDeadline(performResearch(workspaceId, query, type, query), startedAt)
+        if (!outcome) {
+          replyContent = `That research ran longer than I'm allowed in a single request, so I stopped it before it got cut off. It's still saving in the background — check the Research section shortly. If you want it faster, narrow it to one specific question rather than a broad sweep.`
+          break
+        }
         if (outcome.status === 'failed') {
           replyContent = `I hit a snag running that research: ${outcome.error || 'the search or synthesis failed'}. Want me to try again?`
           break

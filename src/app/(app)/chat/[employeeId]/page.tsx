@@ -98,9 +98,24 @@ async function callEmployeeAPI(
       headers,
       body: JSON.stringify({ employeeId, message: userMessage }),
     })
-    const data = await res.json()
+
+    // When a serverless function is killed mid-flight (Vercel's 60s ceiling on
+    // Hobby), the platform returns a PLAIN TEXT error page — not JSON. Parsing
+    // it blindly used to surface as a cryptic "Unexpected token 'A'" to the
+    // boss. Read as text first and only then attempt JSON.
+    const raw = await res.text()
+    let data: { success?: boolean; data?: { content: string; metadata?: unknown }; error?: { message?: string } }
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      if (res.status === 504 || /timed? ?out|FUNCTION_INVOCATION_TIMEOUT/i.test(raw)) {
+        return { content: "That took longer than I'm allowed to run in one go, so it got cut off. Research requests are the usual cause — try narrowing it to one specific question and I'll get through it." }
+      }
+      return { content: `I couldn't complete that — the server returned an unexpected response (HTTP ${res.status}). Please try again.` }
+    }
+
     if (!data.success) return { content: `I ran into an issue: ${data.error?.message || 'please try again.'}` }
-    return { content: data.data.content, metadata: data.data.metadata }
+    return { content: data.data!.content, metadata: data.data!.metadata as Message['metadata'] }
   } catch (err) {
     return { content: `Something went wrong on my end. Please try again. (${String(err)})` }
   }

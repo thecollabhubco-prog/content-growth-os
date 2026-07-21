@@ -43,16 +43,21 @@ export async function performResearch(
       const scraped = await scrapeUrl(inputData)
       rawContent = scraped.markdown
     } else {
-      const searchRes = await tavilySearch(inputData, { searchDepth: 'advanced', maxResults: 8, includeAnswer: true })
+      // 'basic' depth with fewer results: on Vercel Hobby the whole request has
+      // a hard 60s ceiling, and 'advanced' over 8 results was costing ~15s of it.
+      const searchRes = await tavilySearch(inputData, { searchDepth: 'basic', maxResults: 5, includeAnswer: true })
       rawContent = formatTavilyResults(searchRes.results)
       if (searchRes.answer) rawContent = `AI Answer: ${searchRes.answer}\n\n${rawContent}`
     }
 
     // 2. Build the brief with a FREE model (paid gpt-4o would 402 on a $0 account)
+    // 1500 rather than 3500: free models generate slowly, and the brief was
+    // eating ~35s of the 60s budget. The brief stays complete at this size —
+    // it was rarely filling 3500 anyway.
     const briefResult = await generate({
       systemPrompt: 'You are an expert content strategist and SEO researcher. Always return valid JSON.',
       userPrompt: getResearchBriefPrompt({ topic: inputData, searchResults: rawContent }),
-      maxTokens: 3500,
+      maxTokens: 1500,
     })
 
     let brief: Record<string, unknown> = {}
