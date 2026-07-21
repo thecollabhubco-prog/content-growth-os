@@ -51,13 +51,14 @@ export async function performResearch(
     }
 
     // 2. Build the brief with a FREE model (paid gpt-4o would 402 on a $0 account)
-    // 1500 rather than 3500: free models generate slowly, and the brief was
-    // eating ~35s of the 60s budget. The brief stays complete at this size —
-    // it was rarely filling 3500 anyway.
+    // Free models generate ~7s minimum per call and the whole request must fit
+    // inside Vercel Hobby's 60s ceiling (planner + search + this synthesis).
+    // 1000 tokens keeps the brief complete while leaving headroom; raising this
+    // is what pushed research over the limit and got the function killed.
     const briefResult = await generate({
       systemPrompt: 'You are an expert content strategist and SEO researcher. Always return valid JSON.',
       userPrompt: getResearchBriefPrompt({ topic: inputData, searchResults: rawContent }),
-      maxTokens: 1500,
+      maxTokens: 1000,
     })
 
     let brief: Record<string, unknown> = {}
