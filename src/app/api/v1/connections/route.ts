@@ -17,7 +17,30 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (error) return Errors.internal()
-  return ok(data)
+
+  // Google connections live in their own table — surface them here as a
+  // synthetic 'google' platform so the UI shows per-workspace connection state.
+  const { data: googleConns } = await db
+    .from('google_connections')
+    .select('id, workspace_id, email, is_active, last_sync_at, connected_at')
+    .eq('workspace_id', workspaceId)
+    .eq('is_active', true)
+    .order('connected_at', { ascending: false })
+
+  const googleMapped = (googleConns || []).map(g => ({
+    id: g.id,
+    workspace_id: g.workspace_id,
+    platform: 'google',
+    account_name: g.email,
+    account_id: null,
+    account_url: null,
+    scopes: null,
+    is_active: g.is_active,
+    last_sync_at: g.last_sync_at,
+    created_at: g.connected_at,
+  }))
+
+  return ok([...(data || []), ...googleMapped])
 }
 
 // Connect WordPress (direct credentials, not OAuth)
@@ -76,6 +99,17 @@ export async function DELETE(request: NextRequest) {
   if (!platform) return Errors.validation('platform query param required')
 
   const db = createAdminClient()
+
+  // Google connections live in their own table.
+  if (platform === 'google' || platform === 'gmail') {
+    const { error } = await db
+      .from('google_connections')
+      .update({ is_active: false })
+      .eq('workspace_id', workspaceId)
+    if (error) return Errors.internal(error.message)
+    return ok({ disconnected: true, platform: 'google' })
+  }
+
   const { error } = await db
     .from('platform_connections')
     .update({ is_active: false })

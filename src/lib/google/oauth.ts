@@ -12,6 +12,8 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/youtube.upload',
+  'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
 ]
@@ -23,7 +25,9 @@ export function getGoogleAuthUrl(state: string): string {
     response_type: 'code',
     scope: SCOPES.join(' '),
     access_type: 'offline',
-    prompt: 'consent',
+    // Force the account chooser + consent so a different Google account can be
+    // attached per workspace (e.g. one brand per Gmail account).
+    prompt: 'select_account consent',
     state,
   })
   return `${GOOGLE_AUTH_URL}?${params.toString()}`

@@ -16,13 +16,23 @@ export const useThemeStore = create<ThemeStore>()(
       toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark'
         set({ theme: next })
+        document.documentElement.classList.toggle('light', next === 'light')
         document.documentElement.classList.toggle('dark', next === 'dark')
       },
       setTheme: (t) => {
         set({ theme: t })
+        document.documentElement.classList.toggle('light', t === 'light')
         document.documentElement.classList.toggle('dark', t === 'dark')
       },
     }),
-    { name: 'theme-store' }
+    {
+      name: 'theme-store',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          document.documentElement.classList.toggle('light', state.theme === 'light')
+          document.documentElement.classList.toggle('dark', state.theme === 'dark')
+        }
+      },
+    }
   )
 )

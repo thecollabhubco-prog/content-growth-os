@@ -7,80 +7,125 @@ import { useThemeStore } from '@/stores/theme-store'
 import { EMPLOYEES } from '@/lib/employees'
 import { useEmployeeNames } from '@/hooks/use-employee-names'
 import { cn } from '@/lib/utils'
+import { useWorkspace } from '@/lib/workspace/context'
+
+const PAGE_TITLES: Record<string, string> = {
+  '/dashboard': 'Command Center',
+  '/team': 'My Team',
+  '/business': 'Business Memory',
+  '/stories': 'My Stories',
+  '/meeting': 'Voice Meeting',
+  '/calendar': 'Calendar',
+  '/analytics': 'Analytics',
+  '/publishing': 'Connections',
+  '/settings': 'Settings',
+  '/brain': 'Knowledge Brain',
+  '/research': 'Research',
+  '/trends': 'Trends',
+}
 
 export default function TopbarSimple() {
   const { theme, toggleTheme } = useThemeStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const pathname = usePathname()
   const { getName } = useEmployeeNames()
+  const { workspace, activeProjectName } = useWorkspace()
+
+  const pageTitle = PAGE_TITLES[pathname] || (pathname.startsWith('/chat/') ? 'Chat' : '')
 
   return (
     <>
-      <header className="h-14 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between px-4 shrink-0 z-40">
-        {/* Logo (mobile) */}
+      <header
+        className="h-12 flex items-center justify-between px-4 shrink-0"
+        style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar-bg)' }}
+      >
+        {/* Mobile logo */}
         <div className="flex items-center gap-2 md:hidden">
-          <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center shrink-0">
-            <span className="text-white text-xs font-bold">CG</span>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary)' }}>
+            <span className="text-white font-bold text-[11px]">C</span>
           </div>
-          <span className="font-semibold text-sm">ContentOS</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Content OS</span>
         </div>
 
-        {/* Desktop workspace name */}
-        <span className="text-sm font-medium text-[var(--muted-foreground)] hidden md:block">My Workspace</span>
+        {/* Desktop breadcrumb */}
+        <div className="hidden md:flex items-center gap-1.5" style={{ color: 'var(--muted-foreground)' }}>
+          <span className="text-[13px]">{workspace.name}</span>
+          {activeProjectName && <>
+            <span className="text-[13px] opacity-30">/</span>
+            <span className="text-[13px]">{activeProjectName}</span>
+          </>}
+          {pageTitle && <>
+            <span className="text-[13px] opacity-30">/</span>
+            <span className="text-[13px] font-medium" style={{ color: 'var(--foreground)' }}>{pageTitle}</span>
+          </>}
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            className="w-9 h-9 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--muted)] transition-colors text-[var(--muted-foreground)]"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition-colors duration-100"
+            style={{ color: 'var(--muted-foreground)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLElement).style.color = 'var(--foreground)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted-foreground)' }}
             title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
 
-          {/* Mobile team button */}
+          {/* Mobile menu */}
           <button
             onClick={() => setMenuOpen(true)}
-            className="md:hidden w-9 h-9 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--muted)] transition-colors text-[var(--muted-foreground)]"
+            className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center text-base"
+            style={{ color: 'var(--muted-foreground)' }}
           >
             👥
           </button>
 
           {/* Avatar */}
-          <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white text-xs font-semibold">
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold ml-1"
+            style={{ background: 'var(--primary)' }}
+          >
             A
           </div>
         </div>
       </header>
 
-      {/* Mobile team drawer */}
+      {/* Mobile drawer */}
       {menuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-0 top-0 bottom-0 w-72 bg-[var(--card)] border-l border-[var(--border)] flex flex-col overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <span className="font-semibold text-sm">My AI Team</span>
-              <button onClick={() => setMenuOpen(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[var(--muted)]">✕</button>
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setMenuOpen(false)}
+          />
+          <div
+            className="absolute right-0 top-0 bottom-0 w-72 flex flex-col overflow-y-auto"
+            style={{ background: 'var(--sidebar-bg)', borderLeft: '1px solid var(--border)' }}
+          >
+            <div className="flex items-center justify-between px-4 h-12 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+              <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>AI Team</span>
+              <button onClick={() => setMenuOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-lg text-sm" style={{ color: 'var(--muted-foreground)' }}>✕</button>
             </div>
-            <div className="p-3 space-y-0.5">
+            <div className="p-2 space-y-px">
               {EMPLOYEES.map(emp => {
                 const active = pathname === `/chat/${emp.id}`
+                const name = getName(emp.id)
                 return (
                   <Link
                     key={emp.id}
                     href={`/chat/${emp.id}`}
                     onClick={() => setMenuOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
-                      active ? 'bg-[var(--primary)] text-white' : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
-                    )}
+                    className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors')}
+                    style={active ? { background: 'var(--surface)', color: 'var(--foreground)' } : { color: 'var(--muted-foreground)' }}
                   >
-                    <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-base shrink-0', emp.bgColor)}>
+                    <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ background: 'var(--muted)' }}>
                       {emp.emoji}
-                    </div>
+                    </span>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{getName(emp.id)}</div>
-                      <div className={cn('text-xs truncate', active ? 'text-white/70' : 'text-[var(--muted-foreground)]')}>{emp.role}</div>
+                      <p className="text-sm font-medium truncate">{name}</p>
+                      <p className="text-xs truncate" style={{ color: 'var(--muted-foreground)', opacity: 0.7 }}>{emp.role}</p>
                     </div>
                   </Link>
                 )

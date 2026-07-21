@@ -9,15 +9,16 @@ import WorkspaceSwitcher from './workspace-switcher'
 import ProjectSelector from './project-selector'
 
 const NAV_TOP = [
-  { href: '/dashboard', icon: '⚡', label: 'Command Center' },
-  { href: '/team', icon: '👥', label: 'My Team' },
-  { href: '/business', icon: '🏢', label: 'Business Memory' },
-  { href: '/stories', icon: '📖', label: 'My Stories' },
-  { href: '/meeting', icon: '🎙️', label: 'Voice Meeting' },
-  { href: '/calendar', icon: '📅', label: 'Content Calendar' },
-  { href: '/analytics', icon: '📊', label: 'Analytics' },
-  { href: '/publishing', icon: '🔌', label: 'Connections' },
-  { href: '/settings', icon: '⚙️', label: 'Settings' },
+  { href: '/dashboard',  emoji: '⚡', label: 'Command Center' },
+  { href: '/team',       emoji: '👥', label: 'My Team' },
+  { href: '/library',    emoji: '📚', label: 'Content Library' },
+  { href: '/business',   emoji: '🏢', label: 'Business Memory' },
+  { href: '/stories',    emoji: '📖', label: 'My Stories' },
+  { href: '/meeting',    emoji: '🎙️', label: 'Voice Meeting' },
+  { href: '/calendar',   emoji: '📅', label: 'Calendar' },
+  { href: '/analytics',  emoji: '📊', label: 'Analytics' },
+  { href: '/publishing', emoji: '🔌', label: 'Connections' },
+  { href: '/settings',   emoji: '⚙️', label: 'Settings' },
 ]
 
 const DEPT_ORDER = ['Strategy', 'Content', 'Social Media', 'Video', 'Email', 'Design', 'Operations']
@@ -32,86 +33,175 @@ export default function Sidebar() {
   })).filter(d => d.members.length > 0)
 
   return (
-    <aside className="w-[var(--sidebar-width)] shrink-0 border-r border-[var(--border)] bg-[var(--card)] flex flex-col h-full overflow-y-auto">
+    <aside
+      className="flex flex-col h-full"
+      style={{
+        width: 'var(--sidebar-width)',
+        background: 'var(--sidebar-bg)',
+        borderRight: '1px solid var(--border)',
+      }}
+    >
       {/* Logo */}
-      <div className="px-4 py-3 border-b border-[var(--border)]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center shrink-0">
-            <span className="text-white text-xs font-bold">CG</span>
-          </div>
-          <span className="font-semibold text-sm truncate">Content Growth OS</span>
+      <div
+        className="flex items-center gap-2.5 px-4 h-12 shrink-0"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <div
+          className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0"
+          style={{ background: 'var(--primary)', opacity: 0.9 }}
+        >
+          <span className="text-white font-bold text-[11px]">C</span>
         </div>
+        <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--foreground)' }}>
+          Content OS
+        </span>
       </div>
 
-      {/* Workspace Switcher + Project Selector */}
-      <div className="border-b border-[var(--border)]">
+      {/* Workspace + Project switchers */}
+      <div className="shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
         <WorkspaceSwitcher />
-        <div className="border-t border-[var(--border)]/50">
+        <div style={{ borderTop: '1px solid var(--border)' }}>
           <ProjectSelector />
         </div>
       </div>
 
-      {/* Top Nav */}
-      <nav className="px-3 pt-3 pb-1">
-        <ul className="space-y-0.5">
-          {NAV_TOP.map(item => {
-            const active = pathname === item.href
-            return (
-              <li key={item.href}>
-                <Link href={item.href} className={cn(
-                  'flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors',
-                  active
-                    ? 'bg-[var(--primary)] text-white'
-                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
-                )}>
-                  <span className="text-base w-5 text-center shrink-0">{item.icon}</span>
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+      {/* Scrollable nav area */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide pt-2 pb-4">
 
-      <div className="mx-3 my-2 border-t border-[var(--border)]" />
+        {/* Top Nav */}
+        <nav className="px-2 mb-1">
+          <ul className="space-y-px">
+            {NAV_TOP.map(item => {
+              const active = pathname === item.href
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'group flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[13px] transition-all duration-100 relative',
+                    )}
+                    style={active ? {
+                      background: 'var(--surface)',
+                      color: 'var(--foreground)',
+                      fontWeight: 500,
+                    } : {
+                      color: 'var(--muted-foreground)',
+                    }}
+                    onMouseEnter={e => {
+                      if (!active) {
+                        (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'
+                        ;(e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!active) {
+                        (e.currentTarget as HTMLElement).style.color = 'var(--muted-foreground)'
+                        ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                      }
+                    }}
+                  >
+                    {/* Active accent bar */}
+                    {active && (
+                      <span
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[18px] rounded-r-full"
+                        style={{ background: 'var(--primary)' }}
+                      />
+                    )}
+                    {/* Emoji in a subtle pill */}
+                    <span
+                      className="w-6 h-6 flex items-center justify-center rounded-md text-sm shrink-0 transition-all"
+                      style={{
+                        background: active ? 'var(--primary-subtle)' : 'transparent',
+                        fontSize: '14px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {item.emoji}
+                    </span>
+                    <span>{item.label}</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
 
-      {/* AI Team */}
-      <nav className="flex-1 px-3 pb-3 space-y-3 overflow-y-auto">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-foreground)] px-2 mb-1">
-          My AI Team
-        </p>
-        {byDept.map(({ dept, members }) => (
-          <div key={dept}>
-            <p className="text-[10px] font-medium text-[var(--muted-foreground)]/60 px-2 mb-0.5 uppercase tracking-wider">
-              {dept}
-            </p>
-            <ul className="space-y-0.5">
-              {members.map(emp => {
-                const active = pathname === `/chat/${emp.id}` || pathname.startsWith(`/chat/${emp.id}`)
-                const name = getName(emp.id)
-                return (
-                  <li key={emp.id}>
-                    <Link href={`/chat/${emp.id}`} className={cn(
-                      'flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors group',
-                      active
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
-                    )}>
-                      <div className={cn(
-                        'w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 font-semibold text-white',
-                        emp.bgColor
-                      )}>
-                        {name.charAt(0)}
-                      </div>
-                      <span className="truncate text-xs">{name}</span>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
+        {/* Divider */}
+        <div className="mx-3 my-3" style={{ borderTop: '1px solid var(--border)' }} />
+
+        {/* AI Team */}
+        <nav className="px-2">
+          <p
+            className="px-2.5 mb-2 text-[10px] font-semibold uppercase tracking-[0.08em]"
+            style={{ color: 'var(--muted-foreground)' }}
+          >
+            AI Team
+          </p>
+
+          <div className="space-y-4">
+            {byDept.map(({ dept, members }) => (
+              <div key={dept}>
+                <p
+                  className="px-2.5 mb-1 text-[9px] font-medium uppercase tracking-wider"
+                  style={{ color: 'var(--muted-foreground)', opacity: 0.45 }}
+                >
+                  {dept}
+                </p>
+                <ul className="space-y-px">
+                  {members.map(emp => {
+                    const active = pathname.startsWith(`/chat/${emp.id}`)
+                    const name = getName(emp.id)
+                    return (
+                      <li key={emp.id}>
+                        <Link
+                          href={`/chat/${emp.id}`}
+                          className="flex items-center gap-2 px-2.5 py-[6px] rounded-lg transition-all duration-100 relative"
+                          style={active ? {
+                            background: 'var(--surface)',
+                            color: 'var(--foreground)',
+                          } : {
+                            color: 'var(--muted-foreground)',
+                          }}
+                          onMouseEnter={e => {
+                            if (!active) {
+                              (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'
+                              ;(e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!active) {
+                              (e.currentTarget as HTMLElement).style.color = 'var(--muted-foreground)'
+                              ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                            }
+                          }}
+                        >
+                          {active && (
+                            <span
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[14px] rounded-r-full"
+                              style={{ background: 'var(--primary)' }}
+                            />
+                          )}
+                          {/* Emoji avatar */}
+                          <span
+                            className="w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0 text-sm"
+                            style={{
+                              background: active ? 'var(--primary-subtle)' : 'var(--muted)',
+                              fontSize: '12px',
+                            }}
+                          >
+                            {emp.emoji}
+                          </span>
+                          <span className="text-[13px] truncate">{name}</span>
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
           </div>
-        ))}
-      </nav>
+        </nav>
+      </div>
     </aside>
   )
 }

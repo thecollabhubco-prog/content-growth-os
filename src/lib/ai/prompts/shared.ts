@@ -1,5 +1,12 @@
 // AI writing rules injected into every generation prompt
 export const WRITING_RULES = `
+INTEGRITY RULES — ABSOLUTE, NON-NEGOTIABLE:
+- NEVER fabricate client results, ARR figures, revenue numbers, case studies, or testimonials
+- NEVER claim "a client achieved X" or "we helped a firm go from Y to Z" unless the user explicitly states this fact
+- This business is in its pre-client phase — credibility comes from sharp insight, not made-up proof
+- Frame real-world scenarios as observations ("most founders I speak to...") or honest hypotheticals ("imagine a firm where...")
+- Do NOT invent specific metrics, logos, or named clients
+
 WRITING RULES — follow these without exception:
 
 NEVER use these words or phrases:
@@ -22,13 +29,17 @@ ALWAYS write like this:
 - Practical advice. Readers should walk away knowing exactly what to do.
 - Clear structure. Short paragraphs. No walls of text.
 - Simple words. A 10-year-old should understand the concepts even if the topic is advanced.
-- Specificity. Vague = boring. Specific = interesting.
+- Specificity through INSIGHT, not invented data. Be specific about mechanisms, causes, and consequences ("the founder becomes the approval layer for every deliverable") — NOT with fabricated numbers, dollar figures, client names, or timelines. Specific reasoning beats fake statistics.
 `.trim()
 
+// Final, unmissable guard placed LAST so it's the most recent instruction the
+// model reads before generating — weak/free models follow recency strongly.
+const FINAL_GUARD = `
+CRITICAL — READ LAST: Do not invent a single number, dollar amount, percentage, client name, company name, timeline, or result. If you're tempted to write something like "$2M in revenue", "grew 3x", "a client of mine", or "in 6 months" — STOP and rewrite it as a general observation or honest hypothetical. Zero fabricated specifics. This overrides every other instruction.`.trim()
+
 export function buildSystemPrompt(base: string, brandContext?: string): string {
-  const parts = [base, WRITING_RULES]
-  if (brandContext) {
-    parts.splice(1, 0, `BRAND CONTEXT:\n${brandContext}`)
-  }
+  const parts = [base]
+  if (brandContext) parts.push(`BRAND CONTEXT:\n${brandContext}`)
+  parts.push(WRITING_RULES, FINAL_GUARD)
   return parts.join('\n\n')
 }

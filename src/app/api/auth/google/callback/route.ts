@@ -5,8 +5,8 @@ import { encrypt } from '@/lib/encryption/tokens'
 import { logger } from '@/lib/logger'
 
 const DEFAULT_WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
-// Placeholder user id used when there's no auth session
-const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001'
+// System placeholder user (exists in auth.users) used when there's no auth session
+const SYSTEM_USER_ID = '63eb3b57-c13d-419f-af9b-6417118634cd'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -77,7 +77,8 @@ export async function GET(request: NextRequest) {
       `${origin}/publishing?success=google_connected&email=${encodeURIComponent(googleUser.email)}`
     )
   } catch (error) {
-    logger.error('Google OAuth callback error', { error: String(error) })
-    return NextResponse.redirect(`${origin}/publishing?error=google_auth_failed`)
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error('Google OAuth callback error', { error: msg })
+    return NextResponse.redirect(`${origin}/publishing?error=google_auth_failed&detail=${encodeURIComponent(msg)}`)
   }
 }

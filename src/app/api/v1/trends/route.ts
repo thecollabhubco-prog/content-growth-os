@@ -7,6 +7,8 @@ import { getTrendAnalysisPrompt } from '@/lib/ai/prompts/research'
 import { logger } from '@/lib/logger'
 import type { Json } from '@/types/database.types'
 
+export const maxDuration = 60
+
 export async function GET(request: NextRequest) {
 
   const workspaceId = request.headers.get('x-workspace-id') || '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
@@ -51,9 +53,8 @@ export async function POST(request: NextRequest) {
 
     const signalsRaw = allResults.join('\n\n---\n\n')
 
-    // Analyze trends with AI
+    // Analyze trends with AI (free model + fallback — a $0 account 402s on paid models)
     const result = await generate({
-      model: 'openai/gpt-4o-mini',
       systemPrompt: 'You are a content trend analyst. Return only valid JSON.',
       userPrompt: getTrendAnalysisPrompt(signalsRaw),
       temperature: 0.3,

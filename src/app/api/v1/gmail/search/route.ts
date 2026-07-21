@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ok, Errors } from '@/lib/utils/api'
 import { GmailClient } from '@/lib/google/gmail'
@@ -8,7 +8,7 @@ import { logger } from '@/lib/logger'
 
 const DEFAULT_WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
 
-// Natural language search — converts plain English to Gmail query syntax
+// Natural language search â€” converts plain English to Gmail query syntax
 export async function POST(request: NextRequest) {
   try {
     const workspaceId = request.headers.get('x-workspace-id') || DEFAULT_WORKSPACE_ID
@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
 
     if (natural_language) {
       const result = await generate({
-        model: 'anthropic/claude-3.5-haiku',
+        model: 'openai/gpt-oss-120b:free',
         systemPrompt: 'Convert natural language email search queries to Gmail search syntax. Return ONLY the Gmail query string, nothing else. No explanation.',
-        userPrompt: `Convert to Gmail search syntax: "${query}"\n\nExamples:\n- "unread emails from last week" → "is:unread newer_than:7d"\n- "emails from john about invoices" → "from:john subject:invoice"\n- "emails with attachments" → "has:attachment"\n\nReturn only the Gmail query string.`,
+        userPrompt: `Convert to Gmail search syntax: "${query}"\n\nExamples:\n- "unread emails from last week" â†’ "is:unread newer_than:7d"\n- "emails from john about invoices" â†’ "from:john subject:invoice"\n- "emails with attachments" â†’ "has:attachment"\n\nReturn only the Gmail query string.`,
         maxTokens: 100,
         temperature: 0.1,
       })

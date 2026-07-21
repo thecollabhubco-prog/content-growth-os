@@ -37,23 +37,6 @@ async function loadChatHistory(employeeId: string, workspaceId: string): Promise
   }
 }
 
-async function persistMessage(
-  employeeId: string,
-  role: 'user' | 'assistant',
-  content: string,
-  workspaceId: string,
-  metadata: Record<string, unknown> = {}
-): Promise<void> {
-  try {
-    await fetch(`/api/v1/conversations/${employeeId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, content, metadata, workspace_id: workspaceId }),
-    })
-  } catch {
-    // non-fatal — UI still works even if DB write fails
-  }
-}
 
 type Message = {
   id: string
@@ -94,6 +77,10 @@ function getPlaceholder(employeeId: string, name: string): string {
   return placeholders[employeeId] || `Message ${name}...`
 }
 
+// Single agent brain. Every employee routes through /api/v1/agent, which
+// understands intent, remembers the conversation (server-side), picks the right
+// tool (research / draft / publish / email / status / knowledge / …), and
+// replies naturally in character. The endpoint persists both messages itself.
 async function callEmployeeAPI(
   employeeId: string,
   userMessage: string,
@@ -105,161 +92,20 @@ async function callEmployeeAPI(
     'x-workspace-id': workspaceId,
     ...(activeProject ? { 'x-project': activeProject } : {}),
   }
-
   try {
-    switch (employeeId) {
-      case 'james-harper': {
-        const res = await fetch('/api/v1/generate/blog', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ input: { topic: userMessage, keywords: [] }, use_knowledge_brain: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        return {
-          content: `Here's your blog article:\n\n**${d.seo_title || d.h1}**\n\n*Meta: ${d.meta_description}*\n\n---\n\n${d.article}`,
-          metadata: { content_item_id: d.content_item_id, type: 'blog' },
-        }
-      }
-
-      case 'sophia-chen': {
-        const res = await fetch('/api/v1/generate/linkedin', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ input: { topic: userMessage }, format: 'post', use_knowledge_brain: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        return {
-          content: `Here's your LinkedIn post:\n\n---\n\n${d.post}\n\n---\n\nHashtags: ${(d.hashtags || []).map((h: string) => `#${h}`).join(' ')}`,
-          metadata: { content_item_id: d.content_item_id },
-        }
-      }
-
-      case 'ryan-blake': {
-        const isThread = userMessage.toLowerCase().includes('thread')
-        const res = await fetch('/api/v1/generate/x', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ input: { topic: userMessage }, format: isThread ? 'thread' : 'post', use_knowledge_brain: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        if (isThread && d.tweets) {
-          const tweets = d.tweets.map((t: { number: number; text: string }) => `**${t.number}.** ${t.text}`).join('\n\n')
-          return { content: `Here's your thread:\n\n${d.hook_tweet}\n\n${tweets}\n\n${d.closing_tweet}`, metadata: { content_item_id: d.content_item_id } }
-        }
-        return { content: `Here's your tweet:\n\n"${d.post}"`, metadata: { content_item_id: d.content_item_id } }
-      }
-
-      case 'maya-patel': {
-        const res = await fetch('/api/v1/generate/instagram', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ input: { topic: userMessage }, format: 'caption', use_knowledge_brain: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        return {
-          content: `Here's your Instagram caption:\n\n---\n\n${d.caption}\n\n---\n\nHashtags: ${(d.hashtags || []).map((h: string) => `#${h}`).join(' ')}`,
-          metadata: { content_item_id: d.content_item_id },
-        }
-      }
-
-      case 'ethan-cole': {
-        const res = await fetch('/api/v1/generate/youtube', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ input: { topic: userMessage }, format: 'long_form', use_knowledge_brain: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        const titles = (d.title_options || []).map((t: string, i: number) => `${i + 1}. ${t}`).join('\n')
-        return {
-          content: `Here's your YouTube script:\n\n**Title options:**\n${titles}\n\n**Script:**\n\n${d.script}`,
-          metadata: { content_item_id: d.content_item_id },
-        }
-      }
-
-      case 'olivia-rhodes': {
-        const res = await fetch('/api/v1/generate/newsletter', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ input: { topic: userMessage }, format: 'weekly', use_knowledge_brain: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        return {
-          content: `Here's your newsletter:\n\n**Subject:** ${d.subject_line}\n**Preview:** ${d.preview_text}\n\n---\n\n${d.body}\n\n---\n\n${d.ps || ''}`,
-          metadata: { content_item_id: d.content_item_id },
-        }
-      }
-
-      case 'alex-morgan': {
-        const res = await fetch('/api/v1/research', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ title: userMessage, input_type: 'topic', input_data: userMessage }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        return {
-          content: `I've started a deep research session on **"${userMessage}"**.\n\nThis takes 30–60 seconds to complete. I'm searching the web, analyzing competitors, and building your content brief.\n\nSession ID: \`${data.data.session_id}\`\n\nI'll have keyword opportunities, topic clusters, SEO angles, competitor gaps, and recommended content formats ready for you. Check back in a moment or visit the Research section.`,
-          metadata: { session_id: data.data.session_id },
-        }
-      }
-
-      case 'grace-sterling': {
-        return {
-          content: `To add something to the knowledge base, tell me:\n\n1. **What type** — brand voice, audience persona, offer/service, case study, writing sample, or general context\n2. **A title** for it\n3. **The content**\n\nFor example:\n*"Add our brand voice: We speak like a trusted advisor, not a corporate consultant. We use plain language, real examples, and we never use jargon."*\n\nI'll save it and every team member will use it in their work automatically.`,
-        }
-      }
-
-      case 'kai-nakamura': {
-        const res = await fetch('/api/v1/trends', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ industry: userMessage }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        return {
-          content: `Trend scan complete. Found **${d.signals_found} signals** in **${userMessage}**.\n\nTop opportunities:\n${(d.trending_topics || []).slice(0, 5).map((t: { topic: string; direction: string; content_opportunity: string }) => `• **${t.topic}** (${t.direction}) — ${t.content_opportunity}`).join('\n')}\n\nRecommended content:\n${(d.recommended_content || []).slice(0, 3).map((c: { title: string; platform: string; urgency: string }) => `• ${c.title} → ${c.platform} (${c.urgency})`).join('\n')}`,
-        }
-      }
-
-      case 'liam-foster': {
-        const res = await fetch('/api/v1/humanize', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ content: userMessage, auto_rewrite: true }),
-        })
-        const data = await res.json()
-        if (!data.success) return { content: `I ran into an issue: ${data.error?.message}` }
-        const d = data.data
-        const score = Math.round((d.analysis?.overall_score || 0) * 100)
-        return {
-          content: `**Quality Score: ${score}/100**\n\nAI Detection Risk: ${Math.round((d.analysis?.ai_detection_score || 0) * 100)}%\nReadability: ${Math.round((d.analysis?.readability_score || 0) * 100)}%\nNatural Language: ${Math.round((d.analysis?.natural_language_score || 0) * 100)}%\n\n${d.rewrite_applied ? `**Rewritten version:**\n\n${d.humanized_content}` : `Content scored well — no rewrite needed.\n\n${d.analysis?.summary}`}`,
-        }
-      }
-
-      default: {
-        return {
-          content: `I'm ${EMPLOYEES.find(e => e.id === employeeId)?.defaultName || 'your AI assistant'}. I'm here to help with ${EMPLOYEES.find(e => e.id === employeeId)?.role?.toLowerCase()}. What do you need me to work on?`,
-        }
-      }
-    }
+    const res = await fetch('/api/v1/agent', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ employeeId, message: userMessage }),
+    })
+    const data = await res.json()
+    if (!data.success) return { content: `I ran into an issue: ${data.error?.message || 'please try again.'}` }
+    return { content: data.data.content, metadata: data.data.metadata }
   } catch (err) {
     return { content: `Something went wrong on my end. Please try again. (${String(err)})` }
   }
 }
+
 
 export default function ChatPage({ params }: { params: Promise<{ employeeId: string }> }) {
   const { employeeId } = use(params)
@@ -275,6 +121,8 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
   const [renameValue, setRenameValue] = useState('')
   const [showProfile, setShowProfile] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(false)
+  const [actionBusy, setActionBusy] = useState<string | null>(null)
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -298,16 +146,21 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Load chat history from DB on mount
+  // Load chat history from DB whenever the employee OR workspace changes.
+  // Keying on workspaceId fixes the old race where history loaded for the
+  // default workspace before localStorage resolved the real one, then never
+  // reloaded — which looked like "memory was lost" after refresh.
   useEffect(() => {
-    if (!employee || historyLoaded) return
-    setHistoryLoaded(true)
+    if (!employee) return
+    let cancelled = false
+    setHistoryLoaded(false)
     loadChatHistory(employee.id, workspaceId).then(({ conversationId: cid, messages: history }) => {
-      if (cid) setConversationId(cid)
+      if (cancelled) return
+      setConversationId(cid)
       if (history.length > 0) {
         setMessages(history)
       } else {
-        // No history — show welcome message (not saved to DB, just a UI greeting)
+        // No history — show welcome greeting (not persisted, just a UI hello)
         setMessages([{
           id: 'welcome',
           role: 'assistant',
@@ -315,8 +168,11 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
           timestamp: new Date(),
         }])
       }
+      setHistoryLoaded(true)
     })
-  }, [employee, name, historyLoaded])
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee?.id, workspaceId])
 
   if (!employee) {
     return (
@@ -351,16 +207,14 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
 
     setMessages(prev => [...prev, userMessage, loadingMessage])
 
+    // The agent endpoint persists BOTH the user message and its reply to the DB
+    // itself (reliable server-side memory), so we don't double-write here.
     const result = await callEmployeeAPI(employee!.id, userMsg, workspaceId, activeProjectName)
 
     setMessages(prev => prev.map(m =>
       m.isLoading ? { ...m, content: result.content, metadata: result.metadata, isLoading: false } : m
     ))
     setSending(false)
-
-    // Persist both messages to DB (fire-and-forget)
-    persistMessage(employee!.id, 'user', userMsg, workspaceId)
-    persistMessage(employee!.id, 'assistant', result.content, workspaceId, result.metadata || {})
 
     // Auto-speak response if voice enabled
     if (voiceEnabled && result.content) {
@@ -372,6 +226,83 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
 
   async function sendMessage() {
     sendMessageText(input)
+  }
+
+  // ── Draft action card (Publish / Discard buttons on staged drafts) ────────
+  // Mirrors the server's pending-draft scan: the newest assistant message with
+  // awaiting_publish_confirmation is actionable, unless a later message already
+  // resolved it (published or cancelled).
+  const activeDraftMsgId = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const md = messages[i].metadata
+      if (md?.published || md?.publish_cancelled) return null
+      if (messages[i].role === 'assistant' && md?.awaiting_publish_confirmation && md?.content_item_id) {
+        return messages[i].id
+      }
+    }
+    return null
+  })()
+
+  async function persistOutcome(content: string, metadata: Record<string, unknown>) {
+    // Keep server-side memory consistent so the agent knows the draft is resolved.
+    try {
+      await fetch(`/api/v1/conversations/${employee!.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'assistant', content, metadata, workspace_id: workspaceId }),
+      })
+    } catch { /* non-fatal */ }
+  }
+
+  async function handlePublishDraft(msg: Message) {
+    if (actionBusy) return
+    setActionBusy(msg.id)
+    try {
+      const res = await fetch('/api/v1/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-workspace-id': workspaceId },
+        body: JSON.stringify({ content_item_id: msg.metadata!.content_item_id, platform: msg.metadata!.platform }),
+      })
+      const data = await res.json()
+      const outcome = data.success
+        ? `Published to ${msg.metadata!.platform}.\n${data.data.platform_post_url || ''}`
+        : `Publishing failed: ${data.error?.message || 'unknown error'}`
+      const outcomeMeta = data.success ? { published: true } : { publish_failed: true }
+      setMessages(prev => [...prev, {
+        id: `outcome-${Date.now()}`, role: 'assistant', content: outcome, timestamp: new Date(), metadata: outcomeMeta,
+      }])
+      persistOutcome(outcome, outcomeMeta)
+    } catch (e) {
+      setMessages(prev => [...prev, { id: `outcome-${Date.now()}`, role: 'assistant', content: `Publishing failed: ${String(e)}`, timestamp: new Date(), metadata: { publish_failed: true } }])
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  async function handleDiscardDraft(msg: Message) {
+    if (actionBusy) return
+    setActionBusy(msg.id)
+    try {
+      await fetch(`/api/v1/content?id=${msg.metadata!.content_item_id}`, {
+        method: 'DELETE',
+        headers: { 'x-workspace-id': workspaceId },
+      })
+      const outcome = 'Draft discarded.'
+      const outcomeMeta = { publish_cancelled: true }
+      setMessages(prev => [...prev, { id: `outcome-${Date.now()}`, role: 'assistant', content: outcome, timestamp: new Date(), metadata: outcomeMeta }])
+      persistOutcome(outcome, outcomeMeta)
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  function handleCopyDraft(msg: Message) {
+    // Copy just the draft body — the text between the first and last '---' if present.
+    const parts = msg.content.split(/\n---\n?/)
+    const body = parts.length >= 3 ? parts.slice(1, -1).join('\n---\n').trim() : msg.content
+    navigator.clipboard?.writeText(body)
+    setCopiedMsgId(msg.id)
+    setTimeout(() => setCopiedMsgId(null), 1500)
   }
 
   function handleVoiceMicClick() {
@@ -482,6 +413,38 @@ export default function ChatPage({ params }: { params: Promise<{ employeeId: str
                     className="prose-sm"
                     dangerouslySetInnerHTML={{ __html: `<p>${formatContent(msg.content)}</p>` }}
                   />
+                )}
+                {/* Draft action card — real buttons instead of typed confirmations */}
+                {msg.role === 'assistant' && !!msg.metadata?.content_item_id && !msg.isLoading && (
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-[var(--border)]">
+                    {msg.id === activeDraftMsgId && (
+                      <>
+                        <button
+                          onClick={() => handlePublishDraft(msg)}
+                          disabled={actionBusy === msg.id}
+                          className="text-xs font-semibold bg-[var(--primary)] text-white px-3.5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition"
+                        >
+                          {actionBusy === msg.id ? 'Publishing…' : `🚀 Publish to ${msg.metadata?.platform}`}
+                        </button>
+                        <button
+                          onClick={() => handleDiscardDraft(msg)}
+                          disabled={actionBusy === msg.id}
+                          className="text-xs border border-red-500/30 text-red-400 px-3.5 py-2 rounded-lg hover:bg-red-500/10 disabled:opacity-50 transition"
+                        >
+                          Discard
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleCopyDraft(msg)}
+                      className="text-xs border border-[var(--border)] text-[var(--muted-foreground)] px-3.5 py-2 rounded-lg hover:bg-[var(--background)] transition"
+                    >
+                      {copiedMsgId === msg.id ? '✓ Copied' : 'Copy draft'}
+                    </button>
+                    {msg.id === activeDraftMsgId && (
+                      <span className="text-[10px] text-[var(--muted-foreground)]">or just tell {name} what to change</span>
+                    )}
+                  </div>
                 )}
                 <div className={cn('text-[10px] mt-1.5', msg.role === 'user' ? 'text-white/60 text-right' : 'text-[var(--muted-foreground)]')}>
                   {relativeTime(msg.timestamp)}

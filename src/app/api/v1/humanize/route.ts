@@ -1,9 +1,11 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest } from 'next/server'
 import { createTypedAdminClient, from } from '@/lib/supabase/typed'
 import { ok, Errors } from '@/lib/utils/api'
 import { generate } from '@/lib/ai/openrouter'
 import { getHumanizationAnalysisPrompt, getHumanizationRewritePrompt } from '@/lib/ai/prompts/humanize'
 import { logger } from '@/lib/logger'
+
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Analyze
     const analysisResult = await generate({
-      model: 'anthropic/claude-3.5-haiku',
+      model: 'openai/gpt-oss-120b:free',
       systemPrompt: 'You are an AI content quality analyzer. Return only valid JSON.',
       userPrompt: getHumanizationAnalysisPrompt(originalContent),
       temperature: 0.1,
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Rewrite if needed
     if (auto_rewrite && (analysis.rewrite_required || analysis.overall_score < 0.7)) {
       const rewriteResult = await generate({
-        model: 'anthropic/claude-sonnet-4.5',
+        model: 'openai/gpt-oss-120b:free',
         systemPrompt: 'You are an expert editor. Rewrite content to sound natural and human.',
         userPrompt: getHumanizationRewritePrompt(originalContent, analysis.issues),
         temperature: 0.8,

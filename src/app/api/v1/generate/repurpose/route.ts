@@ -13,6 +13,8 @@ import type { Json } from '@/types/database.types'
 
 type OutputFormat = 'linkedin' | 'x' | 'instagram' | 'newsletter' | 'blog'
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   try {
 

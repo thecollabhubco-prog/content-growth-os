@@ -6,6 +6,8 @@ import { getBlogSystemPrompt, getBlogUserPrompt } from '@/lib/ai/prompts/blog'
 import { buildKnowledgeContext } from '@/lib/ai/context-builder'
 import { logger } from '@/lib/logger'
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   try {
 

@@ -2,8 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-
-const WORKSPACE_ID = '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
+import { useWorkspace } from '@/lib/workspace/context'
 
 type Platform = {
   id: string
@@ -35,7 +34,7 @@ const PLATFORMS: Platform[] = [
     icon: '💼',
     description: 'Publish posts and carousels to your LinkedIn profile',
     type: 'oauth',
-    oauthUrl: `/api/v1/connections/linkedin?workspace_id=${WORKSPACE_ID}`,
+    oauthUrl: `/api/v1/connections/linkedin`,
     envVars: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
   },
   {
@@ -44,7 +43,7 @@ const PLATFORMS: Platform[] = [
     icon: '𝕏',
     description: 'Publish tweets and threads to X',
     type: 'oauth',
-    oauthUrl: `/api/v1/connections/x?workspace_id=${WORKSPACE_ID}`,
+    oauthUrl: `/api/v1/connections/x`,
     envVars: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
   },
   {
@@ -53,7 +52,7 @@ const PLATFORMS: Platform[] = [
     icon: '📸',
     description: 'Publish captions and images via Meta Business Suite',
     type: 'oauth',
-    oauthUrl: `/api/v1/connections/instagram?workspace_id=${WORKSPACE_ID}`,
+    oauthUrl: `/api/v1/connections/instagram`,
     envVars: ['META_APP_ID', 'META_APP_SECRET'],
   },
   {
@@ -62,7 +61,7 @@ const PLATFORMS: Platform[] = [
     icon: '▶️',
     description: 'Upload and schedule videos via Google OAuth',
     type: 'oauth',
-    oauthUrl: `/api/auth/google/init?workspace_id=${WORKSPACE_ID}`,
+    oauthUrl: `/api/auth/google/init`,
     envVars: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
   },
 ]
@@ -90,6 +89,7 @@ const errorMessages: Record<string, string> = {
 }
 
 function PublishingContent() {
+  const { workspaceId, workspace } = useWorkspace()
   const searchParams = useSearchParams()
   const successParam = searchParams.get('success')
   const errorParam = searchParams.get('error')
@@ -109,13 +109,14 @@ function PublishingContent() {
     loadConnections()
     const saved = localStorage.getItem('n8n_webhook_url') || ''
     setN8nUrl(saved)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId])
 
   async function loadConnections() {
     setLoading(true)
     try {
       const res = await fetch('/api/v1/connections', {
-        headers: { 'x-workspace-id': WORKSPACE_ID },
+        headers: { 'x-workspace-id': workspaceId },
       })
       const data = await res.json()
       if (data.success) setConnections(data.data || [])
@@ -127,7 +128,7 @@ function PublishingContent() {
     try {
       const res = await fetch('/api/v1/connections', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-workspace-id': WORKSPACE_ID },
+        headers: { 'Content-Type': 'application/json', 'x-workspace-id': workspaceId },
         body: JSON.stringify({
           platform: platform.id,
           credentials,
@@ -149,7 +150,7 @@ function PublishingContent() {
     try {
       await fetch(`/api/v1/connections?platform=${platform}`, {
         method: 'DELETE',
-        headers: { 'x-workspace-id': WORKSPACE_ID },
+        headers: { 'x-workspace-id': workspaceId },
       })
       setConnections(prev => prev.filter(c => c.platform !== platform))
     } finally { setDisconnecting(null) }
@@ -161,8 +162,11 @@ function PublishingContent() {
     setTimeout(() => setN8nSaved(false), 2000)
   }
 
-  const isConnected = (id: string) => connections.some(c => c.platform === id && c.is_active)
-  const getConn = (id: string) => connections.find(c => c.platform === id)
+  // YouTube rides on the same Google OAuth connection as Gmail/Calendar/Drive —
+  // there's no separate 'youtube' row, so treat it as an alias for 'google'.
+  const platformKey = (id: string) => (id === 'youtube' ? 'google' : id)
+  const isConnected = (id: string) => connections.some(c => c.platform === platformKey(id) && c.is_active)
+  const getConn = (id: string) => connections.find(c => c.platform === platformKey(id))
 
   const successMessage = successParam === 'google_connected'
     ? `Google Workspace connected: ${emailParam}`
@@ -231,11 +235,11 @@ function PublishingContent() {
                 <div className="flex items-center gap-2">
                   {connected ? (
                     <button
-                      onClick={() => disconnect(platform.id)}
-                      disabled={disconnecting === platform.id}
+                      onClick={() => disconnect(platformKey(platform.id))}
+                      disabled={disconnecting === platformKey(platform.id)}
                       className="text-xs border border-red-500/30 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition disabled:opacity-50"
                     >
-                      {disconnecting === platform.id ? 'Disconnecting…' : 'Disconnect'}
+                      {disconnecting === platformKey(platform.id) ? 'Disconnecting…' : 'Disconnect'}
                     </button>
                   ) : (
                     <button
@@ -294,7 +298,7 @@ function PublishingContent() {
                     </div>
                   )}
                   <button
-                    onClick={() => { window.location.href = platform.oauthUrl! }}
+                    onClick={() => { window.location.href = `${platform.oauthUrl}?workspace_id=${workspaceId}` }}
                     className="w-full bg-[var(--primary)] text-white py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition"
                   >
                     Authorize with {platform.name} →
@@ -305,9 +309,12 @@ function PublishingContent() {
           )
         })}
 
-        {/* Google Workspace */}
+        {/* Google Workspace — per-workspace account */}
         {(() => {
-          const gConnected = successParam === 'google_connected' || connections.some(c => c.platform === 'gmail')
+          const googleConn = connections.find(c => c.platform === 'google' && c.is_active)
+          const justConnected = successParam === 'google_connected'
+          const gConnected = !!googleConn || justConnected
+          const connectedEmail = googleConn?.account_name || (justConnected ? emailParam : null)
           return (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
               <div className="flex items-center justify-between">
@@ -323,24 +330,34 @@ function PublishingContent() {
                       )}
                     </div>
                     <div className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                      {emailParam && successParam === 'google_connected'
-                        ? emailParam
-                        : 'Gmail, Calendar, Drive, and Docs'
+                      {connectedEmail
+                        ? `${connectedEmail} · ${workspace.name}`
+                        : `Gmail, Calendar, Drive, and Docs — for ${workspace.name}`
                       }
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => { window.location.href = `/api/auth/google/init?workspace_id=${WORKSPACE_ID}` }}
-                  className="text-sm bg-[var(--primary)] text-white px-4 py-2 rounded-lg hover:opacity-90 transition"
-                >
-                  {gConnected ? 'Reconnect' : 'Connect Google'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {gConnected && (
+                    <button
+                      onClick={() => disconnect('google')}
+                      disabled={disconnecting === 'google'}
+                      className="text-xs border border-red-500/30 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition disabled:opacity-50"
+                    >
+                      {disconnecting === 'google' ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { window.location.href = `/api/auth/google/init?workspace_id=${workspaceId}` }}
+                    className="text-sm bg-[var(--primary)] text-white px-4 py-2 rounded-lg hover:opacity-90 transition"
+                  >
+                    {gConnected ? 'Reconnect' : 'Connect Google'}
+                  </button>
+                </div>
               </div>
               <div className="mt-3 bg-[var(--muted)] rounded-lg p-3 text-xs text-[var(--muted-foreground)]">
-                Required: <code>GOOGLE_CLIENT_ID</code> · <code>GOOGLE_CLIENT_SECRET</code> · <code>GOOGLE_REDIRECT_URI</code>
-                <br />
-                <span className="mt-1 block">Set redirect URI to: <code>{`{your-domain}/api/auth/google/callback`}</code></span>
+                Connecting attaches a Google account to the <strong>{workspace.name}</strong> workspace.
+                Switch workspaces in the sidebar to connect a different account (e.g. one per brand).
               </div>
             </div>
           )

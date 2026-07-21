@@ -1,18 +1,17 @@
 import { NextRequest } from 'next/server'
-import { createTypedAdminClient, from } from '@/lib/supabase/typed'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ok, created, Errors } from '@/lib/utils/api'
 import { generateEmbedding } from '@/lib/ai/openrouter'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
-
   const workspaceId = request.headers.get('x-workspace-id') || '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
-
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type')
 
-  const db = createTypedAdminClient()
-  let query = from(db, 'knowledge_items')
+  const db = createAdminClient()
+  let query = db
+    .from('knowledge_items')
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('is_active', true)
@@ -23,17 +22,13 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await query
-
-  if (error) return Errors.internal()
-
+  if (error) return Errors.internal(error.message)
   return ok(data)
 }
 
 export async function POST(request: NextRequest) {
   try {
-
     const workspaceId = request.headers.get('x-workspace-id') || '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
-
     const body = await request.json()
     const { type, title, content, tags, metadata } = body
 
@@ -41,8 +36,9 @@ export async function POST(request: NextRequest) {
       return Errors.validation('type, title, and content are required')
     }
 
-    const db = createTypedAdminClient()
-    const { data: item, error } = await from(db, 'knowledge_items')
+    const db = createAdminClient()
+    const { data: item, error } = await db
+      .from('knowledge_items')
       .insert({
         workspace_id: workspaceId,
         type,
@@ -57,6 +53,7 @@ export async function POST(request: NextRequest) {
 
     if (error) return Errors.internal(error.message)
 
+    // Fire-and-forget embedding generation
     embedKnowledgeItem(item.id, workspaceId, content).catch(err =>
       logger.error('Embedding failed', { itemId: item.id, error: String(err) })
     )
@@ -68,7 +65,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function embedKnowledgeItem(itemId: string, workspaceId: string, content: string) {
-  const db = createTypedAdminClient()
+  const db = createAdminClient()
   const chunkSize = 1000
   const chunks: string[] = []
 
@@ -78,7 +75,7 @@ async function embedKnowledgeItem(itemId: string, workspaceId: string, content: 
 
   for (let i = 0; i < chunks.length; i++) {
     const embedding = await generateEmbedding(chunks[i])
-    await from(db, 'knowledge_embeddings').insert({
+    await db.from('knowledge_embeddings').insert({
       knowledge_item_id: itemId,
       workspace_id: workspaceId,
       embedding: embedding as unknown as string,

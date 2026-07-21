@@ -50,6 +50,7 @@ export class WordPressAdapter implements PublisherInterface {
       const data = await this.request('/posts', 'POST', {
         title: content.title,
         content: content.contentHtml || content.content,
+        excerpt: meta.metaDescription,
         status: 'publish',
         slug: meta.slug,
         categories: meta.categories,

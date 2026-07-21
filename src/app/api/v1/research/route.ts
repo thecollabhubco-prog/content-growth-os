@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server'
 import { createTypedAdminClient, from } from '@/lib/supabase/typed'
 import { ok, created, Errors } from '@/lib/utils/api'
-import { tavilySearch, formatTavilyResults } from '@/lib/research/tavily'
-import { scrapeUrl } from '@/lib/research/firecrawl'
-import { generate } from '@/lib/ai/openrouter'
-import { getResearchBriefPrompt } from '@/lib/ai/prompts/research'
+import { performResearch } from '@/lib/research/pipeline'
 import { logger } from '@/lib/logger'
+
+// Research does live web search + LLM synthesis — allow up to 60s.
+export const maxDuration = 60
 
 export async function GET(request: NextRequest) {
 
@@ -28,92 +28,22 @@ export async function POST(request: NextRequest) {
     const workspaceId = request.headers.get('x-workspace-id') || '393f7d35-cb6d-40a7-b901-7f0d00908f5b'
 
     const body = await request.json()
-    const { title, input_type, input_data, options = {} } = body
+    const { title, input_type, input_data } = body
 
     if (!title || !input_type || !input_data) {
       return Errors.validation('title, input_type, and input_data are required')
     }
 
-    const db = createTypedAdminClient()
-    const { data: session, error: sessionError } = await from(db, 'research_sessions')
-      .insert({
-        workspace_id: workspaceId,
-        title,
-        input_type,
-        input_data,
-        status: 'running',
-        created_by: null,
-      })
-      .select()
-      .single()
+    // Run synchronously and return the completed brief. (Was fire-and-forget,
+    // which serverless killed before it finished → sessions hung on "running".)
+    const outcome = await performResearch(workspaceId, title, input_type, input_data)
 
-    if (sessionError || !session) return Errors.internal(sessionError?.message)
-
-    runResearch(session.id, workspaceId, input_type, input_data, options).catch(err =>
-      logger.error('Research pipeline failed', { sessionId: session.id, error: String(err) })
-    )
-
-    return created({ session_id: session.id, status: 'running' })
+    if (outcome.status === 'failed') {
+      return Errors.internal(outcome.error || 'Research failed')
+    }
+    return created({ session_id: outcome.sessionId, status: 'completed', summary: outcome.summary, brief: outcome.brief })
   } catch (error) {
+    logger.error('Research route error', { error: String(error) })
     return Errors.internal(String(error))
-  }
-}
-
-async function runResearch(
-  sessionId: string,
-  _workspaceId: string,
-  inputType: string,
-  inputData: string,
-  _options: Record<string, boolean>
-) {
-  const db = createTypedAdminClient()
-
-  try {
-    let rawContent = ''
-
-    if (inputType === 'url') {
-      const scraped = await scrapeUrl(inputData)
-      rawContent = scraped.markdown
-    } else if (inputType === 'topic' || inputType === 'keyword') {
-      const searchRes = await tavilySearch(inputData, { searchDepth: 'advanced', maxResults: 10, includeAnswer: true })
-      rawContent = formatTavilyResults(searchRes.results)
-      if (searchRes.answer) rawContent = `AI Answer: ${searchRes.answer}\n\n${rawContent}`
-    } else {
-      rawContent = inputData
-    }
-
-    const briefResult = await generate({
-      model: 'openai/gpt-4o',
-      systemPrompt: 'You are an expert content strategist and SEO researcher.',
-      userPrompt: getResearchBriefPrompt({ topic: inputData, searchResults: rawContent }),
-      maxTokens: 4096,
-    })
-
-    let brief: Record<string, unknown> = {}
-    try {
-      const jsonMatch = briefResult.content.match(/\{[\s\S]*\}/)
-      brief = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
-    } catch {
-      brief = { content_brief: briefResult.content }
-    }
-
-    await from(db, 'research_sessions')
-      .update({
-        status: 'completed',
-        content_brief: brief.content_brief as string,
-        keyword_opportunities: (brief.keyword_opportunities || []) as unknown as import('@/types/database.types').Json,
-        competitor_analysis: (brief.competitor_analysis || []) as unknown as import('@/types/database.types').Json,
-        topic_clusters: (brief.topic_clusters || []) as unknown as import('@/types/database.types').Json,
-        faq_opportunities: (brief.faq_opportunities || []) as unknown as import('@/types/database.types').Json,
-        content_gaps: (brief.content_gaps || []) as unknown as import('@/types/database.types').Json,
-        recommended_formats: (brief.recommended_formats || []) as unknown as import('@/types/database.types').Json,
-        results: brief as unknown as import('@/types/database.types').Json,
-      })
-      .eq('id', sessionId)
-
-    logger.info('Research session completed', { sessionId })
-  } catch (error) {
-    await from(db, 'research_sessions').update({ status: 'failed' }).eq('id', sessionId)
-    throw error
   }
 }

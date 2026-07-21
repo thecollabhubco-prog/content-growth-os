@@ -11,27 +11,20 @@ interface Project {
 }
 
 const PROJECT_TYPES = [
-  { value: 'awareness', label: 'Awareness', icon: '📢' },
-  { value: 'promotional', label: 'Promotional', icon: '🚀' },
-  { value: 'thought_leadership', label: 'Thought Leadership', icon: '💡' },
-  { value: 'launch', label: 'Product Launch', icon: '🎯' },
-  { value: 'nurture', label: 'Nurture / Education', icon: '📚' },
-  { value: 'personal', label: 'Personal Brand', icon: '👤' },
+  { value: 'awareness',         label: 'Awareness' },
+  { value: 'promotional',       label: 'Promotional' },
+  { value: 'thought_leadership', label: 'Thought Leadership' },
+  { value: 'launch',            label: 'Product Launch' },
+  { value: 'nurture',           label: 'Nurture' },
+  { value: 'personal',          label: 'Personal Brand' },
 ]
 
-function getStorageKey(workspaceId: string) {
-  return `cgos_projects_${workspaceId}`
+function getKey(workspaceId: string) { return `cgos_projects_${workspaceId}` }
+function load(workspaceId: string): Project[] {
+  try { return JSON.parse(localStorage.getItem(getKey(workspaceId)) || '[]') } catch { return [] }
 }
-
-function loadProjects(workspaceId: string): Project[] {
-  try {
-    const stored = localStorage.getItem(getStorageKey(workspaceId))
-    return stored ? JSON.parse(stored) : []
-  } catch { return [] }
-}
-
-function saveProjects(workspaceId: string, projects: Project[]) {
-  localStorage.setItem(getStorageKey(workspaceId), JSON.stringify(projects))
+function save(workspaceId: string, projects: Project[]) {
+  localStorage.setItem(getKey(workspaceId), JSON.stringify(projects))
 }
 
 export default function ProjectSelector() {
@@ -42,123 +35,141 @@ export default function ProjectSelector() {
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState('awareness')
 
-  useEffect(() => {
-    setProjects(loadProjects(workspaceId))
-  }, [workspaceId])
+  useEffect(() => { setProjects(load(workspaceId)) }, [workspaceId])
 
-  const createProject = () => {
+  const create = () => {
     if (!newName.trim()) return
-    const proj: Project = {
-      id: `proj_${Date.now()}`,
-      name: newName.trim(),
-      type: newType,
-      createdAt: new Date().toISOString(),
-    }
-    const updated = [...projects, proj]
-    setProjects(updated)
-    saveProjects(workspaceId, updated)
-    setActiveProject(proj.id, proj.name)
-    setNewName('')
-    setCreating(false)
-    setOpen(false)
+    const p: Project = { id: `proj_${Date.now()}`, name: newName.trim(), type: newType, createdAt: new Date().toISOString() }
+    const updated = [...projects, p]
+    setProjects(updated); save(workspaceId, updated)
+    setActiveProject(p.id, p.name)
+    setNewName(''); setCreating(false); setOpen(false)
   }
 
-  const deleteProject = (id: string, e: React.MouseEvent) => {
+  const del = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const updated = projects.filter(p => p.id !== id)
-    setProjects(updated)
-    saveProjects(workspaceId, updated)
+    setProjects(updated); save(workspaceId, updated)
     if (activeProjectId === id) setActiveProject(null, null)
   }
 
-  const typeInfo = (type: string) => PROJECT_TYPES.find(t => t.value === type) || PROJECT_TYPES[0]
-
   return (
-    <div className="relative px-3 pb-2">
+    <div className="relative px-2 py-1.5">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--muted)] transition-colors text-left"
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors duration-100"
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
       >
-        <span className="text-sm shrink-0">
-          {activeProjectId ? typeInfo(projects.find(p => p.id === activeProjectId)?.type || '')?.icon : '📁'}
-        </span>
-        <span className="text-xs text-[var(--muted-foreground)] truncate flex-1">
+        <span className="text-sm shrink-0">📁</span>
+        <span
+          className="text-[12px] flex-1 truncate text-left"
+          style={{ color: activeProjectId ? 'var(--foreground)' : 'var(--muted-foreground)' }}
+        >
           {activeProjectName || 'All Projects'}
         </span>
-        <span className="text-[10px] text-[var(--muted-foreground)] shrink-0">⌄</span>
+        <span className="text-[10px] shrink-0" style={{ color: 'var(--muted-foreground)', opacity: 0.4 }}>⌄</span>
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => { setOpen(false); setCreating(false) }} />
-          <div className="absolute left-3 right-3 top-full mt-1 z-20 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-foreground)] px-3 pt-2 pb-1">
-              Campaign / Project
+          <div
+            className="absolute left-2 right-2 top-full mt-1 z-20 rounded-xl overflow-hidden py-1"
+            style={{
+              background: 'var(--surface-raised)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            }}
+          >
+            <p className="px-3 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--muted-foreground)' }}>
+              Campaign
             </p>
 
-            {/* All Projects option */}
+            {/* All */}
             <button
               onClick={() => { setActiveProject(null, null); setOpen(false) }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--muted)] transition-colors text-xs ${!activeProjectId ? 'bg-[var(--muted)]' : ''}`}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors duration-100"
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
             >
-              <span>📁</span>
-              <span className="text-[var(--foreground)]">All Projects</span>
-              {!activeProjectId && <span className="ml-auto text-[var(--primary)]">✓</span>}
+              <span className="text-sm">📂</span>
+              <span className="text-[13px] flex-1" style={{ color: !activeProjectId ? 'var(--foreground)' : 'var(--muted-foreground)' }}>All Projects</span>
+              {!activeProjectId && <span className="text-[11px]" style={{ color: 'var(--primary)' }}>✓</span>}
             </button>
 
-            {/* Existing projects */}
-            {projects.map(proj => (
+            {projects.map(p => (
               <button
-                key={proj.id}
-                onClick={() => { setActiveProject(proj.id, proj.name); setOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--muted)] transition-colors text-xs group ${activeProjectId === proj.id ? 'bg-[var(--muted)]' : ''}`}
+                key={p.id}
+                onClick={() => { setActiveProject(p.id, p.name); setOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors duration-100 group"
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
               >
-                <span>{typeInfo(proj.type).icon}</span>
-                <span className="text-[var(--foreground)] flex-1 truncate">{proj.name}</span>
-                <span className="text-[9px] text-[var(--muted-foreground)]">{typeInfo(proj.type).label}</span>
-                {activeProjectId === proj.id && <span className="text-[var(--primary)] ml-1">✓</span>}
-                <span
-                  onClick={(e) => deleteProject(proj.id, e)}
-                  className="ml-1 opacity-0 group-hover:opacity-100 text-[var(--muted-foreground)] hover:text-red-400 transition-all cursor-pointer"
-                >✕</span>
+                <span className="text-sm">📁</span>
+                <span className="text-[13px] flex-1 truncate" style={{ color: activeProjectId === p.id ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{p.name}</span>
+                <span className="opacity-0 group-hover:opacity-100 text-[11px] transition-opacity cursor-pointer" onClick={e => del(p.id, e)} style={{ color: 'var(--muted-foreground)' }}>✕</span>
+                {activeProjectId === p.id && <span className="text-[11px]" style={{ color: 'var(--primary)' }}>✓</span>}
               </button>
             ))}
 
-            {/* Create new */}
-            {creating ? (
-              <div className="px-3 py-2 border-t border-[var(--border)]">
-                <input
-                  autoFocus
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') createProject(); if (e.key === 'Escape') setCreating(false) }}
-                  placeholder="Project name..."
-                  className="w-full bg-[var(--muted)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]/50 focus:outline-none focus:border-[var(--primary)] mb-2"
-                />
-                <div className="grid grid-cols-2 gap-1 mb-2">
-                  {PROJECT_TYPES.map(t => (
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 4 }}>
+              {creating ? (
+                <div className="px-3 py-2.5">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') create(); if (e.key === 'Escape') setCreating(false) }}
+                    placeholder="Campaign name..."
+                    className="w-full rounded-lg px-3 py-1.5 text-[13px] mb-2 focus:outline-none"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }}
+                  />
+                  <div className="grid grid-cols-2 gap-1 mb-2.5">
+                    {PROJECT_TYPES.map(t => (
+                      <button
+                        key={t.value}
+                        onClick={() => setNewType(t.value)}
+                        className="text-left px-2 py-1 rounded-md text-[11px] transition-colors"
+                        style={newType === t.value
+                          ? { background: 'var(--primary-subtle)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }
+                          : { background: 'var(--muted)', color: 'var(--muted-foreground)', border: '1px solid transparent' }
+                        }
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
                     <button
-                      key={t.value}
-                      onClick={() => setNewType(t.value)}
-                      className={`text-left px-2 py-1 rounded text-[10px] transition-colors ${newType === t.value ? 'bg-[var(--primary)] text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                      onClick={create}
+                      disabled={!newName.trim()}
+                      className="flex-1 text-white text-[12px] py-1.5 rounded-lg transition-opacity disabled:opacity-40"
+                      style={{ background: 'var(--primary)' }}
                     >
-                      {t.icon} {t.label}
+                      Create
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setCreating(false)}
+                      className="px-3 text-[12px] py-1.5 rounded-lg"
+                      style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={createProject} disabled={!newName.trim()} className="flex-1 bg-[var(--primary)] text-white text-xs py-1 rounded disabled:opacity-50">Create</button>
-                  <button onClick={() => setCreating(false)} className="flex-1 bg-[var(--muted)] text-xs py-1 rounded text-[var(--muted-foreground)]">Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setCreating(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--muted)] transition-colors text-xs text-[var(--primary)] border-t border-[var(--border)]"
-              >
-                <span>+</span> New Project / Campaign
-              </button>
-            )}
+              ) : (
+                <button
+                  onClick={() => setCreating(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors duration-100"
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                >
+                  <span className="text-sm">＋</span>
+                  <span className="text-[13px]" style={{ color: 'var(--muted-foreground)' }}>New Campaign</span>
+                </button>
+              )}
+            </div>
           </div>
         </>
       )}
