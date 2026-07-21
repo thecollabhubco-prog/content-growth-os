@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Analyze
     const analysisResult = await generate({
-      model: 'openai/gpt-oss-120b:free',
+      model: 'openai/gpt-oss-20b:free',
       systemPrompt: 'You are an AI content quality analyzer. Return only valid JSON.',
       userPrompt: getHumanizationAnalysisPrompt(originalContent),
       temperature: 0.1,
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Rewrite if needed
     if (auto_rewrite && (analysis.rewrite_required || analysis.overall_score < 0.7)) {
       const rewriteResult = await generate({
-        model: 'openai/gpt-oss-120b:free',
+        model: 'openai/gpt-oss-20b:free',
         systemPrompt: 'You are an expert editor. Rewrite content to sound natural and human.',
         userPrompt: getHumanizationRewritePrompt(originalContent, analysis.issues),
         temperature: 0.8,

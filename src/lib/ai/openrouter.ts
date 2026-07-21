@@ -2,10 +2,10 @@ import { logger } from '@/lib/logger'
 
 export type OpenRouterModel =
   | 'google/gemma-4-31b-it:free'
-  | 'qwen/qwen3-next-80b-a3b-instruct:free'
-  | 'openai/gpt-oss-120b:free'
+  | 'google/gemma-4-26b-a4b-it:free'
   | 'openai/gpt-oss-20b:free'
-  | 'meta-llama/llama-3.3-70b-instruct:free'
+  | 'nvidia/nemotron-3-super-120b-a12b:free'
+  | 'nvidia/nemotron-nano-9b-v2:free'
   | 'anthropic/claude-haiku-4.5'
   | 'anthropic/claude-sonnet-4.5'
   | 'anthropic/claude-sonnet-4.6'
@@ -37,12 +37,20 @@ const DEFAULT_MODEL: OpenRouterModel = 'google/gemma-4-31b-it:free'
 // Each :free model has its own independent pool, so falling back across
 // several of them (instead of retrying the same one) multiplies effective
 // capacity AND resilience without spending anything. Ordered best-prose-first.
+// NOTE: OpenRouter retires :free models regularly — a model that worked last
+// month can start returning 404. Verify against https://openrouter.ai/api/v1/models
+// before adding one here, and keep the fallthrough in generate() tolerant of 404
+// so a single retired id can never take the whole app down again.
 const FREE_FALLBACK_MODELS: OpenRouterModel[] = [
   'google/gemma-4-31b-it:free',
-  'qwen/qwen3-next-80b-a3b-instruct:free',
-  'openai/gpt-oss-120b:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'openai/gpt-oss-20b:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
 ]
+
+// Structured/JSON routing work (the agent planner) needs a disciplined
+// instruction-follower rather than a prose model.
+export const PLANNER_MODEL: OpenRouterModel = 'openai/gpt-oss-20b:free'
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -104,9 +112,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     lastError = error
     logger.error('OpenRouter API error', { status: response.status, error, model: candidate })
 
-    // Only retry/fallback on rate limiting — other errors (bad request, auth) won't
-    // be fixed by switching models.
-    if (response.status !== 429) {
+    // Fall through to the next model when the problem is model-specific:
+    // 429 = that model's free pool is exhausted, 404 = the model was retired
+    // by OpenRouter, 502/503 = that provider is briefly down. Anything else
+    // (401 auth, 400 bad request) is our fault and switching models won't help.
+    const isModelSpecific = response.status === 429 || response.status === 404 ||
+      response.status === 502 || response.status === 503
+    if (!isModelSpecific) {
       throw new Error(`OpenRouter error: ${response.status}`)
     }
 
@@ -116,7 +128,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   }
 
   logger.error('All OpenRouter free models exhausted', { lastError })
-  throw new Error('OpenRouter error: 429 (all free models rate-limited, try again shortly)')
+  throw new Error('OpenRouter error: every free model failed (rate-limited or unavailable) — try again shortly')
 }
 
 async function callOpenRouterStream(model: OpenRouterModel, systemPrompt: string, userPrompt: string, temperature: number, maxTokens: number) {
@@ -166,7 +178,8 @@ export async function generateStream(options: GenerateOptions): Promise<Readable
     const status = response.status
     logger.error('OpenRouter stream error', { status, model: candidate })
 
-    if (status !== 429) {
+    const isModelSpecific = status === 429 || status === 404 || status === 502 || status === 503
+    if (!isModelSpecific) {
       throw new Error(`OpenRouter stream error: ${status}`)
     }
 
@@ -175,7 +188,7 @@ export async function generateStream(options: GenerateOptions): Promise<Readable
     }
   }
 
-  throw new Error('OpenRouter stream error: 429 (all free models rate-limited, try again shortly)')
+  throw new Error('OpenRouter stream error: every free model failed (rate-limited or unavailable) — try again shortly')
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {

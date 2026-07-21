@@ -111,7 +111,7 @@ ${convo || '(none yet)'}`
       // tuned gpt-oss model follows the action schema far more reliably than the
       // prose-tuned default (which tends to just answer inline). Content quality
       // is handled separately by the content-generation model.
-      model: 'openai/gpt-oss-120b:free',
+      model: 'openai/gpt-oss-20b:free',
       systemPrompt,
       userPrompt: `Boss's latest message: "${message}"`,
       temperature: 0,

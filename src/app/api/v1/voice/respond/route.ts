@@ -220,7 +220,7 @@ MEETING RULES â€” ALWAYS FOLLOW:
     }
 
     const result = await generate({
-      model: 'openai/gpt-oss-120b:free', // fast + cheap for voice responses
+      model: 'openai/gpt-oss-20b:free', // fast + cheap for voice responses
       systemPrompt: systemPrompt + intentHint,
       userPrompt: message,
       maxTokens: intent === 'task_assignment' ? 400 : 200,
