@@ -100,6 +100,7 @@ function PublishingContent() {
   const errorParam = searchParams.get('error')
   const accountParam = searchParams.get('account')
   const emailParam = searchParams.get('email')
+  const detailParam = searchParams.get('detail')
 
   const [connections, setConnections] = useState<Connection[]>([])
   const [loading, setLoading] = useState(true)
@@ -187,7 +188,9 @@ function PublishingContent() {
     ? `${accountParam || successParam.replace('_connected', '')} connected successfully`
     : null
 
-  const errorMessage = errorParam ? (errorMessages[errorParam] || `Error: ${errorParam.replace(/_/g, ' ')}`) : null
+  const errorMessage = errorParam
+    ? `${errorMessages[errorParam] || `Error: ${errorParam.replace(/_/g, ' ')}`}${detailParam ? ` — ${detailParam}` : ''}`
+    : null
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

@@ -38,11 +38,16 @@ export async function GET(request: NextRequest) {
 
   const db = createAdminClient()
 
-  await db
+  const { error: deactivateError } = await db
     .from('platform_connections')
     .update({ is_active: false })
     .eq('workspace_id', workspaceId)
     .eq('platform', 'wordpress')
+
+  if (deactivateError) {
+    logger.error('Failed to deactivate prior WordPress connection', { deactivateError })
+    return NextResponse.redirect(`${origin}/publishing?error=wordpress_save_failed&detail=${encodeURIComponent(deactivateError.message)}`)
+  }
 
   const { error } = await db
     .from('platform_connections')
@@ -61,7 +66,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     logger.error('Failed to save WordPress connection', { error })
-    return NextResponse.redirect(`${origin}/publishing?error=wordpress_save_failed`)
+    return NextResponse.redirect(`${origin}/publishing?error=wordpress_save_failed&detail=${encodeURIComponent(error.message)}`)
   }
 
   logger.info('WordPress connected via authorize-application', { username, workspaceId })
