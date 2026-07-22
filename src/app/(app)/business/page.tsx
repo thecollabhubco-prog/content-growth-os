@@ -43,7 +43,7 @@ const SECTIONS: Section[] = [
     icon: '💼',
     description: 'What do you sell? Price points, outcomes, differentiators.',
     placeholder: '1. Scaling Intensive (£5k) — 2-day strategy session for founders stuck at £500k\n2. Growth OS (£2k/month) — done-with-you systems implementation\n3. Team Build Programme...',
-    knowledgeType: 'service_offer',
+    knowledgeType: 'offer',
   },
   {
     key: 'goals',

@@ -103,7 +103,7 @@ Actions:
 - "generate_content": draft a piece of content. params: {"platform":"blog|linkedin|x|instagram|youtube|newsletter","topic":"<subject>","format":"<optional>"}. Default platform for this employee: ${defaultPlatform || 'infer from request'}.
 - "publish": publish the LAST draft to its platform. ONLY choose this if the boss clearly confirms publishing (e.g. "yes post it", "go ahead", "publish it"). ${pendingDraft ? `There IS a draft awaiting confirmation for platform "${pendingDraft.platform}".` : 'There is NO draft awaiting confirmation — do NOT choose publish.'}
 - "check_status": the boss asks whether something was posted/published/sent, or its current state. params: {"platform":"<optional platform>"}
-- "save_knowledge": the boss wants to save brand voice / persona / offer / business info. params: {"type":"brand_voice|business_info|audience_persona|service_offer|writing_preference|general","title":"...","content":"..."}
+- "save_knowledge": the boss wants to save brand voice / persona / offer / business info. params: {"type":"brand_voice|business_info|audience_persona|offer|writing_preference|case_study|custom","title":"...","content":"..."}
 - "scan_trends": scan for trending topics. params: {"industry":"..."}
 - "analytics": the boss asks how content is performing, how much was produced/published, output stats, or "how are my posts doing". params: {}
 - "humanize": check/rewrite content to sound human. params: {"content":"..."}
@@ -421,7 +421,11 @@ export async function POST(request: NextRequest) {
 
       // ── Save to knowledge base ──
       case 'save_knowledge': {
-        const type = String(plan_.params.type || 'general')
+        // Must be a value allowed by the knowledge_items type CHECK constraint —
+        // 'general'/'service_offer' are NOT valid and would 500 on insert.
+        const ALLOWED_KNOWLEDGE_TYPES = ['brand_voice', 'business_info', 'audience_persona', 'offer', 'service', 'writing_preference', 'case_study', 'testimonial', 'custom']
+        const rawType = String(plan_.params.type || 'custom')
+        const type = ALLOWED_KNOWLEDGE_TYPES.includes(rawType) ? rawType : 'custom'
         const title = String(plan_.params.title || 'Note')
         const content = String(plan_.params.content || message)
         const res = await fetch(`${origin}/api/v1/brain`, { method: 'POST', headers, body: JSON.stringify({ type, title, content }) })

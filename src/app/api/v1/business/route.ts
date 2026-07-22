@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     .select('id, type, title, content, tags, updated_at')
     .eq('workspace_id', workspaceId)
     .eq('is_active', true)
-    .in('type', ['business_info', 'brand_voice', 'audience_persona', 'service_offer', 'writing_preference', 'case_study'])
+    .in('type', ['business_info', 'brand_voice', 'audience_persona', 'offer', 'service', 'writing_preference', 'case_study'])
     .order('updated_at', { ascending: false })
 
   if (error) return Errors.internal(error.message)

@@ -35,7 +35,7 @@ async function fetchKnowledgeForWorkspace(
     .select('type, title, content')
     .eq('workspace_id', workspaceId)
     .eq('is_active', true)
-    .in('type', ['brand_voice', 'business_info', 'writing_preference', 'audience_persona', 'service_offer'])
+    .in('type', ['brand_voice', 'business_info', 'writing_preference', 'audience_persona', 'offer', 'service', 'case_study'])
     .limit(maxItems)
 
   if (!coreItems?.length) return ''

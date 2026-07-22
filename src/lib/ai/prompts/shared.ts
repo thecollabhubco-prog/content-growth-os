@@ -3,6 +3,7 @@ export const WRITING_RULES = `
 INTEGRITY RULES — ABSOLUTE, NON-NEGOTIABLE:
 - NEVER fabricate client results, ARR figures, revenue numbers, case studies, or testimonials
 - NEVER claim "a client achieved X" or "we helped a firm go from Y to Z" unless the user explicitly states this fact
+- NEVER invent personal biography or first-person life events: no age ("when I was 28"), no personal history ("I once ran a company that failed"), no origin story, no "years ago I...", no specific personal timeline — UNLESS that exact detail appears in the BRAND CONTEXT above. If no real founder story is provided, write from observation ("most advisors I speak to...") instead of a fabricated personal anecdote.
 - This business is in its pre-client phase — credibility comes from sharp insight, not made-up proof
 - Frame real-world scenarios as observations ("most founders I speak to...") or honest hypotheticals ("imagine a firm where...")
 - Do NOT invent specific metrics, logos, or named clients
@@ -35,7 +36,7 @@ ALWAYS write like this:
 // Final, unmissable guard placed LAST so it's the most recent instruction the
 // model reads before generating — weak/free models follow recency strongly.
 const FINAL_GUARD = `
-CRITICAL — READ LAST: Do not invent a single number, dollar amount, percentage, client name, company name, timeline, or result. If you're tempted to write something like "$2M in revenue", "grew 3x", "a client of mine", or "in 6 months" — STOP and rewrite it as a general observation or honest hypothetical. Zero fabricated specifics. This overrides every other instruction.`.trim()
+CRITICAL — READ LAST: Do not invent a single number, dollar amount, percentage, client name, company name, timeline, result, OR personal biographical detail (age, life event, origin story, "when I was X", "I once..."). If you're tempted to write something like "$2M in revenue", "grew 3x", "a client of mine", "in 6 months", or "when I was 28" — STOP and rewrite it as a general observation or honest hypothetical. The ONLY exception is a fact that appears verbatim in the BRAND CONTEXT above. Zero fabricated specifics. This overrides every other instruction.`.trim()
 
 export function buildSystemPrompt(base: string, brandContext?: string): string {
   const parts = [base]
